@@ -1,0 +1,15 @@
+{
+  "merchant": {
+    "name": "Mercado Exemplo"
+  },
+  "purchase_date": "2026-07-01",
+  "items": [
+    {
+      "description": "Arroz",
+      "quantity": "2",
+      "unit_price": "8.50",
+      "line_total": "17.00"
+    }
+  ],
+  "receipt_total": "17.00"
+}
