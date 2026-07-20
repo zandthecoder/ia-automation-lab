@@ -494,7 +494,7 @@ TOTAL: 7.50
 | `AC-005`             | `SCN-001`, `SCN-003` | `BR-005`              | `FX-001`, `FX-003` | `EXP-001`, `EXP-003` | `TEST-001`, `TEST-003` |
 | `AC-006`             | `SCN-004`            | `BR-006`, `ERR-014`   | `FX-004`           | N/A                  | `TEST-004`             |
 | `AC-007`             | `SCN-005`            | `BR-007`, `ERR-018`   | `FX-005`           | N/A                  | `TEST-005`             |
-| `AC-008`             | `SCN-006`            | `BR-001`, `ERR-008`   | `FX-006`           | N/A                  | `TEST-006`             |
+| `AC-008`             | `SCN-006`            | `BR-001`, `ERR-002`, `ERR-005`, `ERR-008`, `ERR-015` | `FX-006` e fixtures planejadas | N/A | `TEST-006` e testes planejados de registros ausentes |
 | `AC-009`             | `SCN-007`            | `BR-002`, `ERR-020`   | `FX-007`           | N/A                  | `TEST-007`             |
 | `AC-010`             | `SCN-009`            | `ERR-011`             | `FX-009`           | N/A                  | `TEST-009`             |
 | `AC-011`             | `SCN-004`–`SCN-009`  | Error Contract        | `FX-004`–`FX-009`  | N/A                  | `TEST-004`–`TEST-009`  |
@@ -661,6 +661,8 @@ TOTAL: 7.50
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
 
+Para `AC-008`, deve existir cobertura planejada para a ausência de cada registro obrigatório: `MERCHANT`, `DATE`, `ITEM` e `TOTAL`. `TEST-006` cobre inicialmente apenas `missing_item`; portanto, sua implementação isolada não torna `AC-008` completamente coberto. Testes adicionais para `missing_merchant`, `missing_date` e `missing_total` deverão completar essa cobertura em incrementos posteriores.
+
 Exemplo de tabela futura:
 
 | Error code                 | Synthetic input condition |
@@ -684,6 +686,18 @@ Exemplo de tabela futura:
 Esses testes não precisam ser todos implementados no primeiro incremento.
 
 Eles devem ser adicionados em tarefas pequenas, mantendo rastreabilidade com a SPEC.
+
+## Pendências de planejamento não bloqueantes
+
+Antes da implementação completa dos cenários inválidos, uma decisão humana deverá definir a precedência quando uma mesma entrada puder corresponder a mais de um código de erro.
+
+Exemplos que ainda exigem essa definição:
+
+* `duplicate_total` versus `invalid_record_order`;
+* `duplicate_merchant` versus `invalid_record_order`;
+* registro obrigatório ausente versus registro equivalente presente fora de ordem.
+
+Esta pendência não altera os códigos de erro existentes, não escolhe uma precedência e não bloqueia `SCN-001`. O comportamento aprovado para o primeiro cenário permanece inalterado.
 
 ## Invariant Validation
 

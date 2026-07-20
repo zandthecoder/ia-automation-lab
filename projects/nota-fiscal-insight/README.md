@@ -332,20 +332,20 @@ Caso uma nota real seja usada futuramente para validação:
 ## Current Status
 
 * **Stage:** `now`
-* **Status:** `specification`
+* **SPEC:** `ready`
+* **HARNESS:** `draft`
 
-O projeto está na fase de definição do problema, da SPEC e do harness.
+O comportamento da primeira versão está definido e aprovado na SPEC. O harness está documentado, mas ainda precisa ser materializado e validado antes do primeiro código de produção.
 
 Ainda não existe implementação de produção.
 
 O foco atual é:
 
-* aprovar o comportamento da primeira versão;
-* definir o formato da entrada sintética;
-* definir o schema da saída;
-* criar os primeiros cenários;
-* preparar fixtures e resultados esperados;
-* definir os comandos do harness.
+* criar a primeira fixture sintética e seu expected output;
+* revisar esses artefatos contra a SPEC;
+* preparar o ambiente de teste definido no harness;
+* criar e executar o primeiro teste para observar a falha esperada;
+* tornar o harness pronto para autorizar a implementação mínima de `SCN-001`.
 
 ## Known Limitations
 
@@ -387,31 +387,38 @@ Cada evolução deverá ter uma nova especificação, um novo harness e critéri
 
 ## Running the Project
 
-Ainda não existe um comando oficial de execução.
+Ainda não existe uma aplicação ou um comando de produção. A primeira interface será a função Python `parse_receipt(raw_text: str)`, chamada diretamente pelos testes.
 
-A primeira interface será uma função Python chamada diretamente pelos testes.
+A tecnologia inicial já definida é:
 
-Os comandos definitivos serão documentados em `HARNESS.md` depois que forem escolhidos:
+* ambiente de desenvolvimento: Windows 11;
+* shell: PowerShell;
+* runtime: Python 3.13;
+* test runner: `pytest`;
+* ambiente virtual: `venv`;
+* dependências de produção: apenas a biblioteca padrão do Python.
 
-* o runtime;
-* a estrutura inicial do código;
-* o framework de testes;
-* o entry point do parser.
+Os comandos automatizados usam diretamente:
 
-Esta seção não deve inventar comandos antes que eles existam e tenham sido validados.
+```text
+.\.venv\Scripts\python.exe
+```
+
+A ativação por `Activate.ps1` não é exigida. Os comandos detalhados de preparação e validação estão documentados em `HARNESS.md` e ainda precisam ser executados no ambiente local.
+
+Frontend, API, banco de dados e arquitetura web permanecem indefinidos e fora do escopo atual.
 
 ## Next Milestone
 
 O próximo marco é:
 
-> Aprovar a primeira versão de `SPEC.md` e definir o primeiro cenário sintético antes de implementar o parser.
+> Materializar e validar o primeiro ciclo do harness antes de implementar o parser.
 
 Esse marco estará concluído quando:
 
-* a SPEC estiver com status `ready`;
-* o formato da entrada estiver definido;
-* o schema da saída estiver definido;
-* o primeiro critério de aceite existir;
-* o primeiro cenário Given–When–Then existir;
-* não houver pergunta bloqueante para esse cenário;
-* o harness puder relacionar o cenário a uma fixture, saída esperada e teste.
+* `FX-001` existir no repositório;
+* `EXP-001` existir e tiver sido revisado contra a SPEC;
+* o ambiente virtual e o `pytest` estiverem disponíveis;
+* `TEST-001` puder ser importado e executado;
+* o primeiro teste tiver falhado pelo motivo esperado;
+* o harness tiver sido revisado e estiver `ready`.

@@ -114,8 +114,8 @@ fix: reject missing item prices
 
 ## Phase 0 — Laboratory Setup
 
-**Stage:** `now`
-**Status:** em andamento
+**Stage:** `completed`
+**Status:** concluída
 
 ### Objetivo de aprendizado
 
@@ -143,13 +143,13 @@ Preparar um ambiente mínimo para executar os projetos com organização, versio
 
 ### Critério de conclusão
 
-Esta fase estará concluída quando:
+Esta fase foi concluída com:
 
-* a estrutura inicial estiver versionada;
-* os arquivos principais tiverem conteúdo mínimo;
-* o projeto ativo estiver definido;
-* o repositório puder ser aberto no editor e no Codex;
-* houver pelo menos um commit inicial.
+* a estrutura inicial versionada;
+* os arquivos principais com conteúdo mínimo;
+* o projeto ativo definido;
+* o repositório disponível no editor e no Codex;
+* pelo menos um commit inicial.
 
 ### O que não fazer ainda
 

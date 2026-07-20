@@ -205,7 +205,7 @@ Não é objetivo inicial criar apps completos, dashboards, integrações frágei
 
 ## Status atual
 
-Status: laboratório em fase inicial.
+Status: estrutura inicial do laboratório concluída e primeiro projeto em preparação para o ciclo de harness.
 
 Projeto ativo:
 
@@ -216,14 +216,15 @@ projects/nota-fiscal-insight
 Foco atual:
 
 ```text
-especificação, harness e fixtures sintéticas
+SPEC ready; HARNESS draft; materialização e validação do primeiro ciclo do harness
 ```
+
+O onboarding somente leitura do Codex foi realizado com sucesso. O ambiente e o acesso aos documentos principais foram verificados sem alterações no repositório.
 
 ## Próximos passos
 
-1. Preencher `projects/nota-fiscal-insight/SPEC.md`.
-2. Preencher `projects/nota-fiscal-insight/HARNESS.md`.
-3. Criar fixtures sintéticas mínimas.
-4. Definir a primeira saída esperada em JSON.
-5. Criar o primeiro teste ou script de validação.
-6. Só depois implementar o primeiro parser.
+1. Materializar a fixture sintética `FX-001` e o expected output `EXP-001` já especificados no harness.
+2. Revisar esses arquivos contra a SPEC aprovada.
+3. Preparar e validar o ambiente de teste documentado no harness.
+4. Criar `TEST-001` e observar a falha esperada.
+5. Somente depois implementar o parser mínimo para `SCN-001`.
