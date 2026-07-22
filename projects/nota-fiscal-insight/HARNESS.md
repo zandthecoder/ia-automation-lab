@@ -3,15 +3,15 @@
 ## Metadata
 
 * **Project:** `nota-fiscal-insight`
-* **Status:** `draft`
+* **Status:** `ready`
 * **Related SPEC:** `SPEC.md`
 
-Este harness poderá mudar para `ready` depois que:
+Este harness está `ready` para o primeiro ciclo de implementação porque:
 
-* as fixtures iniciais forem criadas;
-* os expected outputs forem revisados;
-* os comandos forem testados no ambiente local;
-* a estratégia for aprovada pelo usuário.
+* `FX-001` foi criada;
+* `EXP-001` foi revisado;
+* os comandos necessários ao primeiro ciclo `SCN-001` foram testados no ambiente local;
+* a estratégia foi aprovada pelo usuário.
 
 ## Purpose
 
@@ -1023,9 +1023,9 @@ Mesmo com todos os testes passando:
 
 ## Optional Validation Record
 
-| Date         | Commit        | Command               | Result | Notes |          |                       |
-| ------------ | ------------- | --------------------- | ------ | ----- | -------- | --------------------- |
-| `YYYY-MM-DD` | `uncommitted` | `python -m pytest -q` | `pass  | fail  | blocked` | [Execução relevante.] |
+| Date         | Commit        | Command                                                                                                                                                                                               | Result            | Notes                                                           |
+| ------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------- |
+| `2026-07-21` | `uncommitted` | `.\projects\nota-fiscal-insight\.venv\Scripts\python.exe -m pytest .\projects\nota-fiscal-insight\tests\test_receipt_parser.py::test_parse_valid_single_item_receipt -q` | `fail (expected)` | `ModuleNotFoundError: No module named 'src.receipt_parser'`      |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1058,8 +1058,8 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * [x] Expected outputs são determinísticos.
 * [x] Golden files podem ser revisados por humanos.
 * [x] A atualização automática de goldens está proibida.
-* [ ] Os arquivos de fixture foram criados no repositório.
-* [ ] Os expected outputs foram criados no repositório.
+* [x] Os arquivos iniciais de fixture do primeiro ciclo foram criados no repositório.
+* [x] Os expected outputs iniciais do primeiro ciclo foram criados no repositório.
 
 ### Execution
 
@@ -1068,7 +1068,7 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * [x] Dependências e pré-requisitos estão explícitos.
 * [x] A condição de falha é clara.
 * [x] Mensagens de falha devem mostrar divergências.
-* [ ] Os comandos foram testados no ambiente local.
+* [x] Os comandos necessários ao primeiro ciclo `SCN-001` foram testados no ambiente local.
 
 ### Test quality
 
@@ -1077,8 +1077,8 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * [x] Fontes de instabilidade foram controladas.
 * [x] O comportamento central não depende apenas de revisão manual.
 * [x] Os testes validarão comportamento observável.
-* [ ] O primeiro teste foi criado.
-* [ ] O primeiro teste foi observado falhando pelo motivo esperado.
+* [x] O primeiro teste foi criado.
+* [x] O primeiro teste foi observado falhando pelo motivo esperado.
 
 ### Safety and boundaries
 
@@ -1087,27 +1087,27 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * [x] Os limites do harness estão documentados.
 * [x] Riscos residuais estão explícitos.
 * [x] O harness não cria efeitos reais.
-* [ ] O conteúdo final das fixtures foi revisado antes do commit.
+* [x] O conteúdo final de `FX-001` e `EXP-001` foi revisado antes do commit.
 
 ## Harness Approval
 
-* **Reviewed by:** pending human review
-* **Decision:** `changes-required`
-* **Notes:** A estratégia foi definida, mas os arquivos de fixture, expected outputs e comandos ainda precisam ser materializados e validados antes que o status mude para `ready`.
+* **Reviewed by:** project owner
+* **Decision:** `approved`
+* **Notes:** `FX-001` e `EXP-001` foram materializados e revisados; Python 3.13, a `.venv` e o `pytest` foram validados; `TEST-001` foi criado; sua execução produziu o Red esperado por ausência de `src.receipt_parser`. O harness está aprovado para iniciar a implementação mínima de `SCN-001`.
 
 ## Implementation Entry Gate
 
 Antes do primeiro código de produção, confirmar:
 
 * [x] `SPEC.md` está `ready`.
-* [ ] Este harness está `ready`.
+* [x] Este harness está `ready`.
 * [x] O primeiro cenário escolhido é `SCN-001`.
 * [x] `FX-001` está especificada.
 * [x] `EXP-001` está especificado.
 * [x] `TEST-001` está definido.
 * [x] O comando do primeiro teste está documentado.
-* [ ] A fixture `FX-001` existe no repositório.
-* [ ] O expected output `EXP-001` existe no repositório.
-* [ ] O ambiente virtual foi criado.
-* [ ] O `pytest` foi instalado.
-* [ ] O primeiro teste pode ser importado e executado.
+* [x] A fixture `FX-001` existe no repositório.
+* [x] O expected output `EXP-001` existe no repositório.
+* [x] O ambiente virtual foi criado.
+* [x] O `pytest` foi instalado.
+* [x] O comando de `TEST-001` foi executado e produziu a falha Red esperada antes da implementação.
