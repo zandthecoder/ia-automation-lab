@@ -1027,6 +1027,7 @@ Mesmo com todos os testes passando:
 | ------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------- |
 | `2026-07-21` | `uncommitted` | `.\projects\nota-fiscal-insight\.venv\Scripts\python.exe -m pytest .\projects\nota-fiscal-insight\tests\test_receipt_parser.py::test_parse_valid_single_item_receipt -q` | `fail (expected)` | `ModuleNotFoundError: No module named 'src.receipt_parser'`      |
 | `2026-07-22` | `f7e19fc`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 and TEST-002 passed; SCN-001 and SCN-002 validated; multiple-item order preserved.` |
+| `2026-07-22` | `491dd9c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-003 passed; SCN-003 was already supported; quantity "0.750" preserved.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1038,15 +1039,22 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * O Green foi obtido após o parser passar a aceitar uma sequência de registros `ITEM`.
 * `TEST-001` e `TEST-002` passam juntos.
 * A ordem original dos itens é preservada.
+* `FX-003` e `EXP-003` foram materializados e revisados.
+* `TEST-003` foi criado e passou na primeira execução contra o parser existente, caracterizando um Green preexisting.
+* Nenhuma mudança no código de produção foi necessária para `SCN-003`.
+* A quantidade `"0.750"` foi preservada lexicalmente como string.
+* Os cálculos continuaram usando `Decimal`.
+* `TEST-001`, `TEST-002` e `TEST-003` passam juntos.
 
 Implemented and green:
 
 * `TEST-001` / `SCN-001`
 * `TEST-002` / `SCN-002`
+* `TEST-003` / `SCN-003`
 
 Planned but not yet implemented:
 
-* `TEST-003` through `TEST-009`
+* `TEST-004` through `TEST-009`
 
 ## Harness Readiness Checklist
 
