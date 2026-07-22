@@ -1026,8 +1026,27 @@ Mesmo com todos os testes passando:
 | Date         | Commit        | Command                                                                                                                                                                                               | Result            | Notes                                                           |
 | ------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------- |
 | `2026-07-21` | `uncommitted` | `.\projects\nota-fiscal-insight\.venv\Scripts\python.exe -m pytest .\projects\nota-fiscal-insight\tests\test_receipt_parser.py::test_parse_valid_single_item_receipt -q` | `fail (expected)` | `ModuleNotFoundError: No module named 'src.receipt_parser'`      |
+| `2026-07-22` | `f7e19fc`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 and TEST-002 passed; SCN-001 and SCN-002 validated; multiple-item order preserved.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
+
+## Current Implementation Evidence
+
+* `FX-002` e `EXP-002` foram materializados e revisados.
+* `TEST-002` foi criado.
+* O Red foi observado enquanto a implementação estava limitada a um item.
+* O Green foi obtido após o parser passar a aceitar uma sequência de registros `ITEM`.
+* `TEST-001` e `TEST-002` passam juntos.
+* A ordem original dos itens é preservada.
+
+Implemented and green:
+
+* `TEST-001` / `SCN-001`
+* `TEST-002` / `SCN-002`
+
+Planned but not yet implemented:
+
+* `TEST-003` through `TEST-009`
 
 ## Harness Readiness Checklist
 
