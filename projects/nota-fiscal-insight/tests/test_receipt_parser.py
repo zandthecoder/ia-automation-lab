@@ -30,6 +30,9 @@ INVALID_LINE_TOTAL_FIXTURE_PATH = (
 INVALID_RECEIPT_TOTAL_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_receipt_total.txt"
 )
+INVALID_MISSING_ITEM_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_missing_item.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -86,5 +89,18 @@ def test_reject_inconsistent_receipt_total():
 
     assert error.code == "receipt_total_mismatch"
     assert error.line_number == 5
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_receipt_without_items():
+    raw_text = INVALID_MISSING_ITEM_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "missing_item"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
