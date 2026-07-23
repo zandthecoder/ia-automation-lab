@@ -17,6 +17,35 @@ class ReceiptValidationError(Exception):
 def parse_receipt(raw_text: str) -> dict:
     lines = raw_text.splitlines()
 
+    if not lines[0].startswith("MERCHANT:"):
+        raise ReceiptValidationError(
+            code="invalid_record_order",
+            message="Record is out of order; expected MERCHANT on line 1.",
+            line_number=1,
+        )
+
+    if not lines[1].startswith("DATE:"):
+        raise ReceiptValidationError(
+            code="invalid_record_order",
+            message="Record is out of order; expected DATE on line 2.",
+            line_number=2,
+        )
+
+    if not lines[-1].startswith("TOTAL:"):
+        raise ReceiptValidationError(
+            code="invalid_record_order",
+            message=f"Record is out of order; expected TOTAL on line {len(lines)}.",
+            line_number=len(lines),
+        )
+
+    for line_number, item_line in enumerate(lines[2:-1], start=3):
+        if not item_line.startswith("ITEM:"):
+            raise ReceiptValidationError(
+                code="invalid_record_order",
+                message=f"Record is out of order; expected ITEM on line {line_number}.",
+                line_number=line_number,
+            )
+
     merchant_name = lines[0].removeprefix("MERCHANT:").strip()
     purchase_date = lines[1].removeprefix("DATE:").strip()
 
