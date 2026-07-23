@@ -1,0 +1,11 @@
+
+
+  MERCHANT:   Mercado Exemplo
+
+ DATE: 2026-07-08
+
+ ITEM:   Arroz   |  2  |  8.50  |  17.00
+
+ TOTAL: 17.00
+
+
