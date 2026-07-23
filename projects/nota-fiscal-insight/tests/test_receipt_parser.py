@@ -33,6 +33,9 @@ INVALID_RECEIPT_TOTAL_FIXTURE_PATH = (
 INVALID_MISSING_ITEM_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_missing_item.txt"
 )
+INVALID_RECORD_ORDER_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_record_order.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -102,5 +105,19 @@ def test_reject_receipt_without_items():
     error = exc_info.value
 
     assert error.code == "missing_item"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_records_in_invalid_order():
+    raw_text = INVALID_RECORD_ORDER_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "invalid_record_order"
+    assert error.line_number == 1
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
