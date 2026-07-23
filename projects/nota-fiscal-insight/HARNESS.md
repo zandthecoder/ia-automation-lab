@@ -630,7 +630,10 @@ TOTAL: 7.50
 
 * `ReceiptValidationError` é lançada;
 * `error.code == "invalid_record_order"`;
-* a linha problemática é identificada.
+* `error.line_number == 1`;
+* `error.message` é uma string não vazia;
+* a entrada começa com `DATE` em vez de `MERCHANT`;
+* a ordem é validada antes da interpretação dos valores da linha.
 
 ### TEST-008 — Ignore blank lines and external whitespace
 
@@ -758,17 +761,19 @@ Implemented error contract:
 * `line_total_mismatch`
 * `receipt_total_mismatch`
 * `missing_item`
+* `invalid_record_order`
 
-Os demais códigos de erro permanecem planejados e ainda não foram implementados.
+Os contratos relacionados a `TEST-008` e `TEST-009` permanecem planejados e ainda não foram implementados.
 
 Ordem de validação atualmente comprovada pelos testes:
 
-1. validar o total matemático de cada item;
-2. acumular somente itens válidos;
-3. verificar se existe pelo menos um item;
-4. validar o total agregado da nota.
+1. validar a sequência estrutural dos registros;
+2. interpretar e validar matematicamente cada item;
+3. acumular somente itens válidos;
+4. verificar se existe pelo menos um item;
+5. validar o total agregado da nota.
 
-Essa ordem explica por que `line_total_mismatch` e `missing_item` precedem `receipt_total_mismatch` nas entradas atualmente cobertas. Ela não define uma política geral de precedência para erros futuros.
+Uma linha com tipo inesperado é rejeitada antes do parsing específico de seu conteúdo. A ausência completa do bloco de itens continua produzindo `missing_item`, não `invalid_record_order`. Essas evidências se limitam às entradas atualmente cobertas e não definem uma política geral de precedência para erros futuros.
 
 ## External Dependency Substitutes
 
@@ -1055,6 +1060,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `68df7b2`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-004 passed; ReceiptValidationError and line_total_mismatch validated at line 3.` |
 | `2026-07-22` | `ac51e95`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-005 passed; receipt_total_mismatch validated at line 5 using Decimal item totals.` |
 | `2026-07-22` | `9124b85`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-006 passed; missing_item validated before receipt_total_mismatch for receipts without ITEM records.` |
+| `2026-07-22` | `17c489c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-007 passed; invalid_record_order validated at line 1 before record-specific parsing.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1093,6 +1099,11 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `TEST-006` não define expectativa específica para `line_number`.
 * A ausência de itens é verificada antes da comparação do total agregado.
 * `TEST-001` a `TEST-006` passam juntos.
+* `FX-007` foi materializado e revisado com a ordem inválida `DATE → MERCHANT → ITEM → TOTAL`.
+* `TEST-007` foi inicialmente observado vermelho pela ausência do contrato `invalid_record_order`.
+* O parser passou a validar o tipo esperado antes do parsing específico da linha.
+* O código `invalid_record_order`, `line_number == 1` e uma mensagem não vazia foram validados.
+* `TEST-001` a `TEST-007` passam juntos.
 
 Implemented and green:
 
@@ -1102,10 +1113,11 @@ Implemented and green:
 * `TEST-004` / `SCN-004`
 * `TEST-005` / `SCN-005`
 * `TEST-006` / `SCN-006`
+* `TEST-007` / `SCN-007`
 
 Planned but not yet implemented:
 
-* `TEST-007` through `TEST-009`
+* `TEST-008` through `TEST-009`
 
 ## Harness Readiness Checklist
 
