@@ -575,6 +575,7 @@ TOTAL: 7.50
 * `ReceiptValidationError` é lançada;
 * `error.code == "line_total_mismatch"`;
 * `error.line_number == 3`;
+* `error.message` é uma string não vazia;
 * nenhum resultado parcial é retornado.
 
 ### TEST-005 — Reject inconsistent receipt total
@@ -745,6 +746,12 @@ line_number
 O `code` é o identificador estável usado pelos testes.
 
 A mensagem deve ser legível em inglês, mas o texto completo não precisa ser comparado quando o código já representar o contrato.
+
+Implemented error contract:
+
+* `line_total_mismatch`
+
+Os demais códigos de erro permanecem planejados e ainda não foram implementados.
 
 ## External Dependency Substitutes
 
@@ -1028,6 +1035,7 @@ Mesmo com todos os testes passando:
 | `2026-07-21` | `uncommitted` | `.\projects\nota-fiscal-insight\.venv\Scripts\python.exe -m pytest .\projects\nota-fiscal-insight\tests\test_receipt_parser.py::test_parse_valid_single_item_receipt -q` | `fail (expected)` | `ModuleNotFoundError: No module named 'src.receipt_parser'`      |
 | `2026-07-22` | `f7e19fc`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 and TEST-002 passed; SCN-001 and SCN-002 validated; multiple-item order preserved.` |
 | `2026-07-22` | `491dd9c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-003 passed; SCN-003 was already supported; quantity "0.750" preserved.` |
+| `2026-07-22` | `68df7b2`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-004 passed; ReceiptValidationError and line_total_mismatch validated at line 3.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1045,16 +1053,24 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * A quantidade `"0.750"` foi preservada lexicalmente como string.
 * Os cálculos continuaram usando `Decimal`.
 * `TEST-001`, `TEST-002` e `TEST-003` passam juntos.
+* `FX-004` foi materializado e revisado.
+* `TEST-004` foi inicialmente observado vermelho pela ausência de `ReceiptValidationError`.
+* A classe pública `ReceiptValidationError` foi implementada com `code`, `message` e `line_number`.
+* O erro `line_total_mismatch` passou a ser emitido para a inconsistência matemática do item.
+* `line_number == 3` e uma mensagem não vazia foram validados.
+* O item inválido não é retornado como resultado parcial.
+* `TEST-001` a `TEST-004` passam juntos.
 
 Implemented and green:
 
 * `TEST-001` / `SCN-001`
 * `TEST-002` / `SCN-002`
 * `TEST-003` / `SCN-003`
+* `TEST-004` / `SCN-004`
 
 Planned but not yet implemented:
 
-* `TEST-004` through `TEST-009`
+* `TEST-005` through `TEST-009`
 
 ## Harness Readiness Checklist
 
