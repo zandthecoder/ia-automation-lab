@@ -53,6 +53,12 @@ def parse_receipt(raw_text: str) -> dict:
         )
         calculated_receipt_total += decimal_line_total
 
+    if not items:
+        raise ReceiptValidationError(
+            code="missing_item",
+            message="Receipt must contain at least one item.",
+        )
+
     total_line_number = len(lines)
     receipt_total = lines[-1].removeprefix("TOTAL:").strip()
     decimal_receipt_total = Decimal(receipt_total)
