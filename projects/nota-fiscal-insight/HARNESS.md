@@ -610,7 +610,11 @@ TOTAL: 7.50
 **Pass condition:**
 
 * `ReceiptValidationError` é lançada;
-* `error.code == "missing_item"`.
+* `error.code == "missing_item"`;
+* `error.message` é uma string não vazia;
+* a entrada não contém nenhum registro `ITEM`;
+* `missing_item` é emitido antes de `receipt_total_mismatch` para `FX-006`;
+* nenhum valor específico de `line_number` é exigido.
 
 ### TEST-007 — Reject invalid record order
 
@@ -753,6 +757,7 @@ Implemented error contract:
 
 * `line_total_mismatch`
 * `receipt_total_mismatch`
+* `missing_item`
 
 Os demais códigos de erro permanecem planejados e ainda não foram implementados.
 
@@ -760,9 +765,10 @@ Ordem de validação atualmente comprovada pelos testes:
 
 1. validar o total matemático de cada item;
 2. acumular somente itens válidos;
-3. validar o total agregado da nota.
+3. verificar se existe pelo menos um item;
+4. validar o total agregado da nota.
 
-Essa ordem explica por que `line_total_mismatch` precede `receipt_total_mismatch` nas entradas atualmente cobertas. Ela não define uma política geral de precedência para erros futuros.
+Essa ordem explica por que `line_total_mismatch` e `missing_item` precedem `receipt_total_mismatch` nas entradas atualmente cobertas. Ela não define uma política geral de precedência para erros futuros.
 
 ## External Dependency Substitutes
 
@@ -1048,6 +1054,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `491dd9c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-003 passed; SCN-003 was already supported; quantity "0.750" preserved.` |
 | `2026-07-22` | `68df7b2`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-004 passed; ReceiptValidationError and line_total_mismatch validated at line 3.` |
 | `2026-07-22` | `ac51e95`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-005 passed; receipt_total_mismatch validated at line 5 using Decimal item totals.` |
+| `2026-07-22` | `9124b85`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-006 passed; missing_item validated before receipt_total_mismatch for receipts without ITEM records.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1079,6 +1086,13 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * O total declarado `30.00` foi rejeitado porque a soma correta dos itens é `29.00`.
 * A soma dos itens e a comparação do total usam `Decimal`.
 * `TEST-001` a `TEST-005` passam juntos.
+* `FX-006` foi materializado e revisado com `MERCHANT`, `DATE` e `TOTAL`, mas sem registros `ITEM`.
+* `TEST-006` foi inicialmente observado vermelho porque o parser emitia `receipt_total_mismatch` em vez de `missing_item`.
+* O Red demonstrou uma questão localizada de precedência para notas sem itens.
+* O código `missing_item` e uma mensagem não vazia foram validados.
+* `TEST-006` não define expectativa específica para `line_number`.
+* A ausência de itens é verificada antes da comparação do total agregado.
+* `TEST-001` a `TEST-006` passam juntos.
 
 Implemented and green:
 
@@ -1087,10 +1101,11 @@ Implemented and green:
 * `TEST-003` / `SCN-003`
 * `TEST-004` / `SCN-004`
 * `TEST-005` / `SCN-005`
+* `TEST-006` / `SCN-006`
 
 Planned but not yet implemented:
 
-* `TEST-006` through `TEST-009`
+* `TEST-007` through `TEST-009`
 
 ## Harness Readiness Checklist
 
