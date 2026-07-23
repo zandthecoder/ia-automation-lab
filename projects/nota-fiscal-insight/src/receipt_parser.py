@@ -15,30 +15,49 @@ class ReceiptValidationError(Exception):
 
 
 def parse_receipt(raw_text: str) -> dict:
-    lines = raw_text.splitlines()
+    normalized_lines: list[tuple[int, str]] = []
 
-    if not lines[0].startswith("MERCHANT:"):
+    for line_number, raw_line in enumerate(raw_text.splitlines(), start=1):
+        normalized_line = raw_line.strip()
+
+        if normalized_line:
+            normalized_lines.append((line_number, normalized_line))
+
+    merchant_line_number, merchant_line = normalized_lines[0]
+    date_line_number, date_line = normalized_lines[1]
+    total_line_number, total_line = normalized_lines[-1]
+
+    if not merchant_line.startswith("MERCHANT:"):
         raise ReceiptValidationError(
             code="invalid_record_order",
-            message="Record is out of order; expected MERCHANT on line 1.",
-            line_number=1,
+            message=(
+                "Record is out of order; expected MERCHANT "
+                f"on line {merchant_line_number}."
+            ),
+            line_number=merchant_line_number,
         )
 
-    if not lines[1].startswith("DATE:"):
+    if not date_line.startswith("DATE:"):
         raise ReceiptValidationError(
             code="invalid_record_order",
-            message="Record is out of order; expected DATE on line 2.",
-            line_number=2,
+            message=(
+                "Record is out of order; expected DATE "
+                f"on line {date_line_number}."
+            ),
+            line_number=date_line_number,
         )
 
-    if not lines[-1].startswith("TOTAL:"):
+    if not total_line.startswith("TOTAL:"):
         raise ReceiptValidationError(
             code="invalid_record_order",
-            message=f"Record is out of order; expected TOTAL on line {len(lines)}.",
-            line_number=len(lines),
+            message=(
+                "Record is out of order; expected TOTAL "
+                f"on line {total_line_number}."
+            ),
+            line_number=total_line_number,
         )
 
-    for line_number, item_line in enumerate(lines[2:-1], start=3):
+    for line_number, item_line in normalized_lines[2:-1]:
         if not item_line.startswith("ITEM:"):
             raise ReceiptValidationError(
                 code="invalid_record_order",
@@ -46,13 +65,13 @@ def parse_receipt(raw_text: str) -> dict:
                 line_number=line_number,
             )
 
-    merchant_name = lines[0].removeprefix("MERCHANT:").strip()
-    purchase_date = lines[1].removeprefix("DATE:").strip()
+    merchant_name = merchant_line.removeprefix("MERCHANT:").strip()
+    purchase_date = date_line.removeprefix("DATE:").strip()
 
     items = []
     calculated_receipt_total = Decimal("0")
 
-    for line_number, item_line in enumerate(lines[2:-1], start=3):
+    for line_number, item_line in normalized_lines[2:-1]:
         item_fields = item_line.removeprefix("ITEM:").split("|")
         description, quantity, unit_price, line_total = (
             field.strip() for field in item_fields
@@ -88,8 +107,7 @@ def parse_receipt(raw_text: str) -> dict:
             message="Receipt must contain at least one item.",
         )
 
-    total_line_number = len(lines)
-    receipt_total = lines[-1].removeprefix("TOTAL:").strip()
+    receipt_total = total_line.removeprefix("TOTAL:").strip()
     decimal_receipt_total = Decimal(receipt_total)
 
     if calculated_receipt_total != decimal_receipt_total:
