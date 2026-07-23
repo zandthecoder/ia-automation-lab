@@ -648,8 +648,12 @@ TOTAL: 7.50
 **Pass condition:**
 
 * linhas em branco são ignoradas;
-* espaços externos são removidos;
-* o resultado é exatamente igual a `EXP-004`.
+* espaços antes dos prefixos e espaços adicionais depois deles são removidos;
+* espaços em torno dos campos de `ITEM` são removidos;
+* o resultado é exatamente igual a `EXP-004`;
+* `merchant.name == "Mercado Exemplo"`;
+* a descrição do item é `"Arroz"`;
+* os valores numéricos permanecem strings.
 
 ### TEST-009 — Reject unsupported numeric format
 
@@ -763,17 +767,33 @@ Implemented error contract:
 * `missing_item`
 * `invalid_record_order`
 
-Os contratos relacionados a `TEST-008` e `TEST-009` permanecem planejados e ainda não foram implementados.
+`SCN-008` é um cenário válido e não adiciona código de erro. O contrato relacionado a `TEST-009` permanece planejado e ainda não foi implementado.
 
-Ordem de validação atualmente comprovada pelos testes:
+Fluxo atualmente comprovado pelos testes:
 
-1. validar a sequência estrutural dos registros;
-2. interpretar e validar matematicamente cada item;
-3. acumular somente itens válidos;
-4. verificar se existe pelo menos um item;
-5. validar o total agregado da nota.
+1. enumerar as linhas brutas preservando seus números originais;
+2. remover whitespace externo de cada linha;
+3. ignorar linhas vazias;
+4. validar a sequência estrutural dos registros normalizados;
+5. extrair e limpar os valores;
+6. validar matematicamente cada item;
+7. acumular somente itens válidos;
+8. verificar se existe pelo menos um item;
+9. validar o total agregado;
+10. produzir a saída estruturada.
 
-Uma linha com tipo inesperado é rejeitada antes do parsing específico de seu conteúdo. A ausência completa do bloco de itens continua produzindo `missing_item`, não `invalid_record_order`. Essas evidências se limitam às entradas atualmente cobertas e não definem uma política geral de precedência para erros futuros.
+A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
+
+Em `FX-008`, os registros correspondem a:
+
+* linha original 3 → `MERCHANT`;
+* linha original 5 → `DATE`;
+* linha original 7 → `ITEM`;
+* linha original 9 → `TOTAL`.
+
+`TEST-008` é um cenário válido e não valida diretamente exceções nessas linhas. A regressão dos cenários inválidos confirma `line_total_mismatch` na linha 3, `receipt_total_mismatch` na linha 5 e `invalid_record_order` na linha 1. A ausência completa do bloco de itens continua produzindo `missing_item`, não `invalid_record_order`.
+
+Esse fluxo representa o comportamento comprovado pelos testes atuais, não uma arquitetura definitiva nem uma política geral para entradas ainda não cobertas.
 
 ## External Dependency Substitutes
 
@@ -1061,6 +1081,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `ac51e95`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-005 passed; receipt_total_mismatch validated at line 5 using Decimal item totals.` |
 | `2026-07-22` | `9124b85`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-006 passed; missing_item validated before receipt_total_mismatch for receipts without ITEM records.` |
 | `2026-07-22` | `17c489c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-007 passed; invalid_record_order validated at line 1 before record-specific parsing.` |
+| `2026-07-22` | `52ef59a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-008 passed; blank lines and external whitespace normalized while original line numbers remain preserved.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1104,6 +1125,15 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * O parser passou a validar o tipo esperado antes do parsing específico da linha.
 * O código `invalid_record_order`, `line_number == 1` e uma mensagem não vazia foram validados.
 * `TEST-001` a `TEST-007` passam juntos.
+* `FX-008` e `EXP-004` foram materializados e revisados com linhas em branco e whitespace externo.
+* `TEST-008` foi inicialmente observado vermelho pela ausência de suporte completo a whitespace externo e linhas em branco.
+* Linhas vazias passaram a ser ignoradas, e o whitespace externo das linhas passou a ser removido.
+* Os valores depois de `MERCHANT:`, `DATE:`, `ITEM:` e `TOTAL:` são limpos.
+* Os quatro campos de `ITEM` são limpos individualmente.
+* `"Mercado Exemplo"` e `"Arroz"` são retornados sem espaços externos, preservando espaços internos significativos.
+* Quantidades e valores monetários continuam sendo retornados como strings.
+* Os cálculos continuam usando `Decimal`.
+* `TEST-001` a `TEST-008` passam juntos.
 
 Implemented and green:
 
@@ -1114,10 +1144,11 @@ Implemented and green:
 * `TEST-005` / `SCN-005`
 * `TEST-006` / `SCN-006`
 * `TEST-007` / `SCN-007`
+* `TEST-008` / `SCN-008`
 
 Planned but not yet implemented:
 
-* `TEST-008` through `TEST-009`
+* `TEST-009` / `SCN-009`
 
 ## Harness Readiness Checklist
 
