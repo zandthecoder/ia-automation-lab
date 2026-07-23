@@ -7,7 +7,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.receipt_parser import parse_receipt
+from src.receipt_parser import ReceiptValidationError, parse_receipt
 
 
 FIXTURE_PATH = PROJECT_ROOT / "fixtures" / "inputs" / "valid_single_item.txt"
@@ -26,6 +26,9 @@ DECIMAL_QUANTITY_EXPECTED_PATH = (
 )
 INVALID_LINE_TOTAL_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_line_total.txt"
+)
+INVALID_RECEIPT_TOTAL_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_receipt_total.txt"
 )
 
 
@@ -62,8 +65,6 @@ def test_parse_decimal_quantity_preserving_lexical_value():
 def test_reject_inconsistent_line_total():
     raw_text = INVALID_LINE_TOTAL_FIXTURE_PATH.read_text(encoding="utf-8")
 
-    from src.receipt_parser import ReceiptValidationError
-
     with pytest.raises(ReceiptValidationError) as exc_info:
         parse_receipt(raw_text)
 
@@ -71,5 +72,19 @@ def test_reject_inconsistent_line_total():
 
     assert error.code == "line_total_mismatch"
     assert error.line_number == 3
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_inconsistent_receipt_total():
+    raw_text = INVALID_RECEIPT_TOTAL_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "receipt_total_mismatch"
+    assert error.line_number == 5
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
