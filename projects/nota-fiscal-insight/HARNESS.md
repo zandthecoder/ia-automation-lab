@@ -593,6 +593,8 @@ TOTAL: 7.50
 * `ReceiptValidationError` é lançada;
 * `error.code == "receipt_total_mismatch"`;
 * `error.line_number == 5`;
+* `error.message` é uma string não vazia;
+* o total declarado é comparado com a soma dos totais dos itens;
 * nenhum resultado parcial é retornado.
 
 ### TEST-006 — Reject missing item
@@ -750,8 +752,17 @@ A mensagem deve ser legível em inglês, mas o texto completo não precisa ser c
 Implemented error contract:
 
 * `line_total_mismatch`
+* `receipt_total_mismatch`
 
 Os demais códigos de erro permanecem planejados e ainda não foram implementados.
+
+Ordem de validação atualmente comprovada pelos testes:
+
+1. validar o total matemático de cada item;
+2. acumular somente itens válidos;
+3. validar o total agregado da nota.
+
+Essa ordem explica por que `line_total_mismatch` precede `receipt_total_mismatch` nas entradas atualmente cobertas. Ela não define uma política geral de precedência para erros futuros.
 
 ## External Dependency Substitutes
 
@@ -1036,6 +1047,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `f7e19fc`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 and TEST-002 passed; SCN-001 and SCN-002 validated; multiple-item order preserved.` |
 | `2026-07-22` | `491dd9c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-003 passed; SCN-003 was already supported; quantity "0.750" preserved.` |
 | `2026-07-22` | `68df7b2`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-004 passed; ReceiptValidationError and line_total_mismatch validated at line 3.` |
+| `2026-07-22` | `ac51e95`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-005 passed; receipt_total_mismatch validated at line 5 using Decimal item totals.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1060,6 +1072,13 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `line_number == 3` e uma mensagem não vazia foram validados.
 * O item inválido não é retornado como resultado parcial.
 * `TEST-001` a `TEST-004` passam juntos.
+* `FX-005` foi materializado e revisado.
+* `TEST-005` foi inicialmente observado vermelho porque o parser ainda não atendia ao contrato `receipt_total_mismatch`.
+* O comportamento foi implementado reutilizando a classe pública `ReceiptValidationError`.
+* O código `receipt_total_mismatch`, `line_number == 5` e uma mensagem não vazia foram validados.
+* O total declarado `30.00` foi rejeitado porque a soma correta dos itens é `29.00`.
+* A soma dos itens e a comparação do total usam `Decimal`.
+* `TEST-001` a `TEST-005` passam juntos.
 
 Implemented and green:
 
@@ -1067,10 +1086,11 @@ Implemented and green:
 * `TEST-002` / `SCN-002`
 * `TEST-003` / `SCN-003`
 * `TEST-004` / `SCN-004`
+* `TEST-005` / `SCN-005`
 
 Planned but not yet implemented:
 
-* `TEST-005` through `TEST-009`
+* `TEST-006` through `TEST-009`
 
 ## Harness Readiness Checklist
 
