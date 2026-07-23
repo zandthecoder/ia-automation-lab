@@ -24,6 +24,12 @@ DECIMAL_QUANTITY_FIXTURE_PATH = (
 DECIMAL_QUANTITY_EXPECTED_PATH = (
     PROJECT_ROOT / "fixtures" / "expected" / "valid_decimal_quantity.json"
 )
+EXTERNAL_WHITESPACE_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "valid_external_whitespace.txt"
+)
+EXTERNAL_WHITESPACE_EXPECTED_PATH = (
+    PROJECT_ROOT / "fixtures" / "expected" / "valid_external_whitespace.json"
+)
 INVALID_LINE_TOTAL_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_line_total.txt"
 )
@@ -66,6 +72,19 @@ def test_parse_decimal_quantity_preserving_lexical_value():
 
     assert result == expected_receipt
     assert result["items"][0]["quantity"] == "0.750"
+
+
+def test_parse_valid_receipt_with_external_whitespace():
+    raw_text = EXTERNAL_WHITESPACE_FIXTURE_PATH.read_text(encoding="utf-8")
+    expected_receipt = json.loads(
+        EXTERNAL_WHITESPACE_EXPECTED_PATH.read_text(encoding="utf-8")
+    )
+
+    result = parse_receipt(raw_text)
+
+    assert result == expected_receipt
+    assert result["merchant"]["name"] == "Mercado Exemplo"
+    assert result["items"][0]["description"] == "Arroz"
 
 
 def test_reject_inconsistent_line_total():
