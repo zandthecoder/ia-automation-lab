@@ -53,9 +53,16 @@ def parse_receipt(raw_text: str) -> dict:
         )
         calculated_receipt_total += decimal_line_total
 
+    total_line_number = len(lines)
     receipt_total = lines[-1].removeprefix("TOTAL:").strip()
-    if calculated_receipt_total != Decimal(receipt_total):
-        raise ValueError("Receipt total does not match the sum of item totals.")
+    decimal_receipt_total = Decimal(receipt_total)
+
+    if calculated_receipt_total != decimal_receipt_total:
+        raise ReceiptValidationError(
+            code="receipt_total_mismatch",
+            message="Receipt total does not match the sum of item totals.",
+            line_number=total_line_number,
+        )
 
     return {
         "merchant": {"name": merchant_name},
