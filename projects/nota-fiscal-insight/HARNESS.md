@@ -281,6 +281,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-007` | `fixtures/inputs/invalid_record_order.txt`      | `SCN-007`        | Registros válidos em ordem incorreta.          |              no |
 | `FX-008` | `fixtures/inputs/valid_external_whitespace.txt` | `SCN-008`        | Entrada válida com espaços e linhas em branco. |              no |
 | `FX-009` | `fixtures/inputs/invalid_numeric_format.txt`    | `SCN-009`        | Quantidade ou valor com formato não suportado. |              no |
+| `FX-010` | `fixtures/inputs/invalid_empty_input.txt`       | `SCN-010`        | Entrada completamente vazia.                   |              no |
 
 ## Fixture Contents
 
@@ -372,6 +373,14 @@ DATE: 2026-07-09
 ITEM: Tomate | 0,750 | 10.00 | 7.50
 TOTAL: 7.50
 ```
+
+### FX-010 — Empty input
+
+**Status:** planned
+
+O arquivo `fixtures/inputs/invalid_empty_input.txt` deverá possuir exatamente `0 bytes`, sem quebra de linha ou qualquer outro conteúdo.
+
+`FX-010` representa somente uma string completamente vazia. Uma entrada contendo apenas whitespace não faz parte de `SCN-010` e poderá ser avaliada separadamente no futuro.
 
 ## Expected Output Manifest
 
@@ -501,6 +510,31 @@ TOTAL: 7.50
 | `AC-012`             | `SCN-004`, `SCN-005` | `BR-009`, `INV-006`   | `FX-004`, `FX-005` | N/A                  | `TEST-004`, `TEST-005` |
 | `AC-013`             | `SCN-008`            | General parsing rules | `FX-008`           | `EXP-004`            | `TEST-008`             |
 | `AC-014`             | Todos                | `DEC-004`             | Todas              | Todas aplicáveis     | Suíte completa         |
+| N/A                  | `SCN-010`            | `ERR-001`, `empty_input` | `FX-010`        | N/A                  | `TEST-010`             |
+
+## Planned Scenario Expansion
+
+### SCN-010 — Empty input
+
+**Status:** planned
+
+**Given**
+
+* a entrada é uma string vazia;
+* após a normalização, nenhuma linha lógica existe.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "empty_input"`;
+* `error.message` é uma string não vazia e legível;
+* nenhum resultado parcial é retornado.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-010`. O atributo `line_number` permanece na interface pública de `ReceiptValidationError`, mas o teste futuro não deverá verificar `error.line_number is None` nem qualquer número específico.
 
 ## Test Cases
 
@@ -674,17 +708,42 @@ TOTAL: 7.50
 * não existe exigência específica para `line_number`;
 * o texto exato da mensagem não é comparado.
 
+### TEST-010 — Reject empty input
+
+**Status:** planned
+
+**Covers:** `SCN-010`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-010`
+
+**Expected error:** `empty_input`
+
+**Pass condition:**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "empty_input"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* nenhum requisito específico é imposto a `line_number`;
+* nenhuma exceção técnica como `IndexError` escapa;
+* nenhum resultado parcial é retornado.
+
+`TEST-010` ainda não foi criado nem executado.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
 
 Para `AC-008`, deve existir cobertura planejada para a ausência de cada registro obrigatório: `MERCHANT`, `DATE`, `ITEM` e `TOTAL`. `TEST-006` cobre inicialmente apenas `missing_item`; portanto, sua implementação isolada não torna `AC-008` completamente coberto. Testes adicionais para `missing_merchant`, `missing_date` e `missing_total` deverão completar essa cobertura em incrementos posteriores.
 
+`empty_input` foi promovido da lista genérica futura para o planejamento formal `SCN-010` / `FX-010` / `TEST-010`. Esses artefatos permanecem planejados e ainda não foram implementados.
+
 Exemplo de tabela futura:
 
 | Error code                 | Synthetic input condition |
 | -------------------------- | ------------------------- |
-| `empty_input`              | string vazia              |
 | `missing_merchant`         | entrada começa em `DATE`  |
 | `duplicate_merchant`       | duas linhas `MERCHANT`    |
 | `invalid_merchant`         | nome vazio                |
@@ -707,6 +766,12 @@ Eles devem ser adicionados em tarefas pequenas, mantendo rastreabilidade com a S
 ## Pendências de planejamento não bloqueantes
 
 Antes da implementação completa dos cenários inválidos, uma decisão humana deverá definir a precedência quando uma mesma entrada puder corresponder a mais de um código de erro.
+
+### Decisão localizada para SCN-010
+
+Quando nenhuma linha lógica permanece após a normalização, `empty_input` deve ser emitido antes da validação de registros obrigatórios individuais.
+
+Essa decisão se limita a entradas sem nenhuma linha lógica. Nesse caso, a entrada não deve ser classificada primeiro como `missing_merchant`, `missing_date`, `missing_item`, `missing_total` ou `invalid_record_order`. Nenhuma política geral é estabelecida para outras combinações de erros.
 
 Exemplos que ainda exigem essa definição:
 
@@ -915,6 +980,18 @@ python -m pytest tests/test_receipt_parser.py::test_parse_valid_single_item_rece
 ### Task 5 — Add next scenario
 
 Somente depois que `TEST-001` passar e o diff for revisado, selecionar `SCN-002` ou outro incremento pequeno.
+
+## Planned TDD Sequence for SCN-010
+
+1. Formalizar `SCN-010` no harness.
+2. Criar `FX-010` como arquivo de zero bytes.
+3. Criar `TEST-010`.
+4. Executar `TEST-010` e observar o Red.
+5. Implementar uma guarda mínima após a normalização.
+6. Executar a suíte completa.
+7. Registrar as evidências.
+
+Somente o primeiro passo está sendo realizado nesta tarefa. A fixture, o teste e a implementação permanecem pendentes.
 
 ## TDD Workflow
 
@@ -1165,7 +1242,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the initial harness.
+* `TEST-010` / `SCN-010`
 
 ### Resumo dos artefatos cobertos
 
@@ -1187,6 +1264,8 @@ Structured-error scenarios:
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
+
+`SCN-010` inaugura uma expansão incremental das lacunas já definidas na SPEC. `TEST-010` ainda não foi criado nem executado e não faz parte dos nove testes verdes do harness inicial.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
