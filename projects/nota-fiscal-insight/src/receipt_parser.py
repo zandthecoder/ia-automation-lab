@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 class ReceiptValidationError(Exception):
@@ -77,7 +77,14 @@ def parse_receipt(raw_text: str) -> dict:
             field.strip() for field in item_fields
         )
 
-        decimal_quantity = Decimal(quantity)
+        try:
+            decimal_quantity = Decimal(quantity)
+        except InvalidOperation as exc:
+            raise ReceiptValidationError(
+                code="invalid_quantity",
+                message="Quantity has an invalid or unsupported numeric format.",
+            ) from exc
+
         decimal_unit_price = Decimal(unit_price)
         decimal_line_total = Decimal(line_total)
         expected_line_total = decimal_quantity * decimal_unit_price
