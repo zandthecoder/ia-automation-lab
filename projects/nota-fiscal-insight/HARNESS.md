@@ -669,7 +669,10 @@ TOTAL: 7.50
 
 * `ReceiptValidationError` é lançada;
 * `error.code == "invalid_quantity"`;
-* o formato com vírgula não é aceito.
+* a quantidade `0,750` não é aceita;
+* `error.message` é uma string não vazia;
+* não existe exigência específica para `line_number`;
+* o texto exato da mensagem não é comparado.
 
 ## Additional Error Validation
 
@@ -766,8 +769,9 @@ Implemented error contract:
 * `receipt_total_mismatch`
 * `missing_item`
 * `invalid_record_order`
+* `invalid_quantity`
 
-`SCN-008` é um cenário válido e não adiciona código de erro. O contrato relacionado a `TEST-009` permanece planejado e ainda não foi implementado.
+`SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
 Fluxo atualmente comprovado pelos testes:
 
@@ -776,13 +780,17 @@ Fluxo atualmente comprovado pelos testes:
 3. ignorar linhas vazias;
 4. validar a sequência estrutural dos registros normalizados;
 5. extrair e limpar os valores;
-6. validar matematicamente cada item;
-7. acumular somente itens válidos;
-8. verificar se existe pelo menos um item;
-9. validar o total agregado;
-10. produzir a saída estruturada.
+6. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
+7. converter os demais números necessários;
+8. validar o total matemático de cada item;
+9. acumular somente itens válidos;
+10. verificar se existe pelo menos um item;
+11. validar o total agregado;
+12. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
+
+Esse fluxo descreve o comportamento coberto pelos testes atuais, não uma arquitetura definitiva.
 
 Em `FX-008`, os registros correspondem a:
 
@@ -1082,6 +1090,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `9124b85`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-006 passed; missing_item validated before receipt_total_mismatch for receipts without ITEM records.` |
 | `2026-07-22` | `17c489c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-007 passed; invalid_record_order validated at line 1 before record-specific parsing.` |
 | `2026-07-22` | `52ef59a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-008 passed; blank lines and external whitespace normalized while original line numbers remain preserved.` |
+| `2026-07-23` | `2e3a921`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-009 passed; invalid quantity format translated from InvalidOperation to ReceiptValidationError with code invalid_quantity.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1134,6 +1143,13 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Quantidades e valores monetários continuam sendo retornados como strings.
 * Os cálculos continuam usando `Decimal`.
 * `TEST-001` a `TEST-008` passam juntos.
+* `FX-009` foi materializado e revisado com a quantidade inválida `0,750`.
+* `TEST-009` foi inicialmente observado vermelho porque uma falha técnica de conversão decimal escapava pela interface pública.
+* `InvalidOperation` passou a ser capturada especificamente durante a conversão da quantidade e é preservada como causa por encadeamento de exceções.
+* A falha é traduzida para a exceção pública `ReceiptValidationError` com o código `invalid_quantity` e uma mensagem não vazia.
+* `TEST-009` não estabelece exigência específica para `line_number`.
+* A quantidade válida `"0.750"` continua preservada lexicalmente como string.
+* `TEST-001` a `TEST-009` passam juntos.
 
 Implemented and green:
 
@@ -1145,10 +1161,34 @@ Implemented and green:
 * `TEST-006` / `SCN-006`
 * `TEST-007` / `SCN-007`
 * `TEST-008` / `SCN-008`
+* `TEST-009` / `SCN-009`
 
 Planned but not yet implemented:
 
-* `TEST-009` / `SCN-009`
+* None in the initial harness.
+
+### Resumo dos artefatos cobertos
+
+Valid golden scenarios:
+
+* `SCN-001`
+* `SCN-002`
+* `SCN-003`
+* `SCN-008`
+
+Structured-error scenarios:
+
+* `SCN-004`
+* `SCN-005`
+* `SCN-006`
+* `SCN-007`
+* `SCN-009`
+
+### Estado do harness inicial
+
+Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
+
+Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
 ## Harness Readiness Checklist
 
