@@ -23,6 +23,12 @@ def parse_receipt(raw_text: str) -> dict:
         if normalized_line:
             normalized_lines.append((line_number, normalized_line))
 
+    if not normalized_lines:
+        raise ReceiptValidationError(
+            code="empty_input",
+            message="Receipt input is empty.",
+        )
+
     merchant_line_number, merchant_line = normalized_lines[0]
     date_line_number, date_line = normalized_lines[1]
     total_line_number, total_line = normalized_lines[-1]
