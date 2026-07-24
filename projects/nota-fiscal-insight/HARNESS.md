@@ -376,9 +376,9 @@ TOTAL: 7.50
 
 ### FX-010 — Empty input
 
-**Status:** planned
+**Status:** materialized
 
-O arquivo `fixtures/inputs/invalid_empty_input.txt` deverá possuir exatamente `0 bytes`, sem quebra de linha ou qualquer outro conteúdo.
+O arquivo `fixtures/inputs/invalid_empty_input.txt` possui exatamente `0 bytes`, sem quebra de linha ou qualquer outro conteúdo. Sua leitura textual produz `""`.
 
 `FX-010` representa somente uma string completamente vazia. Uma entrada contendo apenas whitespace não faz parte de `SCN-010` e poderá ser avaliada separadamente no futuro.
 
@@ -512,11 +512,11 @@ O arquivo `fixtures/inputs/invalid_empty_input.txt` deverá possuir exatamente `
 | `AC-014`             | Todos                | `DEC-004`             | Todas              | Todas aplicáveis     | Suíte completa         |
 | N/A                  | `SCN-010`            | `ERR-001`, `empty_input` | `FX-010`        | N/A                  | `TEST-010`             |
 
-## Planned Scenario Expansion
+## Scenario Expansion
 
 ### SCN-010 — Empty input
 
-**Status:** planned
+**Status:** implemented and green
 
 **Given**
 
@@ -534,7 +534,7 @@ O arquivo `fixtures/inputs/invalid_empty_input.txt` deverá possuir exatamente `
 * `error.message` é uma string não vazia e legível;
 * nenhum resultado parcial é retornado.
 
-O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-010`. O atributo `line_number` permanece na interface pública de `ReceiptValidationError`, mas o teste futuro não deverá verificar `error.line_number is None` nem qualquer número específico.
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-010`. O atributo `line_number` permanece na interface pública de `ReceiptValidationError`, mas `TEST-010` não verifica `error.line_number is None` nem qualquer número específico.
 
 ## Test Cases
 
@@ -710,7 +710,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### TEST-010 — Reject empty input
 
-**Status:** planned
+**Status:** implemented and green
 
 **Covers:** `SCN-010`, Error Contract
 
@@ -730,15 +730,13 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 * nenhuma exceção técnica como `IndexError` escapa;
 * nenhum resultado parcial é retornado.
 
-`TEST-010` ainda não foi criado nem executado.
-
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
 
 Para `AC-008`, deve existir cobertura planejada para a ausência de cada registro obrigatório: `MERCHANT`, `DATE`, `ITEM` e `TOTAL`. `TEST-006` cobre inicialmente apenas `missing_item`; portanto, sua implementação isolada não torna `AC-008` completamente coberto. Testes adicionais para `missing_merchant`, `missing_date` e `missing_total` deverão completar essa cobertura em incrementos posteriores.
 
-`empty_input` foi promovido da lista genérica futura para o planejamento formal `SCN-010` / `FX-010` / `TEST-010`. Esses artefatos permanecem planejados e ainda não foram implementados.
+`empty_input` foi promovido da lista genérica futura para o cenário formal `SCN-010` / `FX-010` / `TEST-010`, que está implementado e verde.
 
 Exemplo de tabela futura:
 
@@ -767,11 +765,11 @@ Eles devem ser adicionados em tarefas pequenas, mantendo rastreabilidade com a S
 
 Antes da implementação completa dos cenários inválidos, uma decisão humana deverá definir a precedência quando uma mesma entrada puder corresponder a mais de um código de erro.
 
-### Decisão localizada para SCN-010
+### Comportamento comprovado para SCN-010
 
-Quando nenhuma linha lógica permanece após a normalização, `empty_input` deve ser emitido antes da validação de registros obrigatórios individuais.
+Quando nenhuma linha lógica permanece após a normalização, `empty_input` é emitido antes da validação de registros obrigatórios individuais e antes da validação de ordem.
 
-Essa decisão se limita a entradas sem nenhuma linha lógica. Nesse caso, a entrada não deve ser classificada primeiro como `missing_merchant`, `missing_date`, `missing_item`, `missing_total` ou `invalid_record_order`. Nenhuma política geral é estabelecida para outras combinações de erros.
+Essa precedência comprovada se limita a uma sequência lógica vazia. Nesse caso, a entrada não é classificada primeiro como `missing_merchant`, `missing_date`, `missing_item`, `missing_total` ou `invalid_record_order`. Nenhuma política geral é estabelecida para entradas parcialmente preenchidas ou outras combinações de erros.
 
 Exemplos que ainda exigem essa definição:
 
@@ -835,23 +833,28 @@ Implemented error contract:
 * `missing_item`
 * `invalid_record_order`
 * `invalid_quantity`
+* `empty_input`
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
+
+O contrato `empty_input` está comprovado por `SCN-010` usando uma string completamente vazia. Essa evidência não declara suporte formal para entradas contendo somente whitespace e não implementa outros códigos de registros ausentes.
 
 Fluxo atualmente comprovado pelos testes:
 
 1. enumerar as linhas brutas preservando seus números originais;
 2. remover whitespace externo de cada linha;
 3. ignorar linhas vazias;
-4. validar a sequência estrutural dos registros normalizados;
-5. extrair e limpar os valores;
-6. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
-7. converter os demais números necessários;
-8. validar o total matemático de cada item;
-9. acumular somente itens válidos;
-10. verificar se existe pelo menos um item;
-11. validar o total agregado;
-12. produzir a saída estruturada.
+4. verificar se restou alguma linha lógica;
+5. emitir `empty_input` quando a sequência lógica estiver vazia;
+6. validar a sequência estrutural dos registros normalizados;
+7. extrair e limpar os valores;
+8. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
+9. converter os demais números necessários;
+10. validar o total matemático de cada item;
+11. acumular somente itens válidos;
+12. verificar se existe pelo menos um item;
+13. validar o total agregado;
+14. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
 
@@ -981,7 +984,7 @@ python -m pytest tests/test_receipt_parser.py::test_parse_valid_single_item_rece
 
 Somente depois que `TEST-001` passar e o diff for revisado, selecionar `SCN-002` ou outro incremento pequeno.
 
-## Planned TDD Sequence for SCN-010
+## TDD Sequence for SCN-010
 
 1. Formalizar `SCN-010` no harness.
 2. Criar `FX-010` como arquivo de zero bytes.
@@ -991,7 +994,7 @@ Somente depois que `TEST-001` passar e o diff for revisado, selecionar `SCN-002`
 6. Executar a suíte completa.
 7. Registrar as evidências.
 
-Somente o primeiro passo está sendo realizado nesta tarefa. A fixture, o teste e a implementação permanecem pendentes.
+Esta sequência foi concluída. A implementação adicionou somente uma guarda mínima de comportamento após a normalização, sem refatoração estrutural, seguindo a recomendação `No refactor now`.
 
 ## TDD Workflow
 
@@ -1168,6 +1171,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `17c489c`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-007 passed; invalid_record_order validated at line 1 before record-specific parsing.` |
 | `2026-07-22` | `52ef59a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-008 passed; blank lines and external whitespace normalized while original line numbers remain preserved.` |
 | `2026-07-23` | `2e3a921`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-009 passed; invalid quantity format translated from InvalidOperation to ReceiptValidationError with code invalid_quantity.` |
+| `2026-07-23` | `315f80a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-010 passed; empty input now raises ReceiptValidationError with code empty_input instead of IndexError.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1227,6 +1231,14 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `TEST-009` não estabelece exigência específica para `line_number`.
 * A quantidade válida `"0.750"` continua preservada lexicalmente como string.
 * `TEST-001` a `TEST-009` passam juntos.
+* `FX-010` foi materializado como um arquivo de zero bytes, cuja leitura textual produz `""`.
+* `TEST-010` foi inicialmente observado vermelho porque `IndexError` escapava da interface pública.
+* Uma guarda mínima foi adicionada imediatamente após a normalização para verificar a ausência de linhas lógicas, antes de qualquer acesso por índice.
+* A entrada completamente vazia passou a emitir `ReceiptValidationError` com o código `empty_input` e uma mensagem não vazia.
+* Nenhum contrato específico para `line_number` foi introduzido por `SCN-010`.
+* Quando a sequência lógica está vazia, `empty_input` precede a validação dos registros obrigatórios individuais e a validação de ordem.
+* `SCN-010` foi implementado sem refatoração estrutural, seguindo a recomendação `No refactor now`.
+* `TEST-001` a `TEST-010` passam juntos.
 
 Implemented and green:
 
@@ -1239,10 +1251,11 @@ Implemented and green:
 * `TEST-007` / `SCN-007`
 * `TEST-008` / `SCN-008`
 * `TEST-009` / `SCN-009`
+* `TEST-010` / `SCN-010`
 
 Planned but not yet implemented:
 
-* `TEST-010` / `SCN-010`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -1260,12 +1273,13 @@ Structured-error scenarios:
 * `SCN-006`
 * `SCN-007`
 * `SCN-009`
+* `SCN-010`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` inaugura uma expansão incremental das lacunas já definidas na SPEC. `TEST-010` ainda não foi criado nem executado e não faz parte dos nove testes verdes do harness inicial.
+`SCN-010` inaugurou uma expansão incremental das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com a expansão, `TEST-001` a `TEST-010` estão verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
