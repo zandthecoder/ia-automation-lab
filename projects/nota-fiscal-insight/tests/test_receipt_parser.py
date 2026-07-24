@@ -45,6 +45,9 @@ INVALID_RECORD_ORDER_FIXTURE_PATH = (
 INVALID_NUMERIC_FORMAT_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_numeric_format.txt"
 )
+INVALID_EMPTY_INPUT_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_empty_input.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -154,5 +157,20 @@ def test_reject_unsupported_quantity_format():
     error = exc_info.value
 
     assert error.code == "invalid_quantity"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_empty_input():
+    raw_text = INVALID_EMPTY_INPUT_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    assert raw_text == ""
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "empty_input"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
