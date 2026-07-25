@@ -1,0 +1,4 @@
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-12
+ITEM: | 2 | 8.50 | 17.00
+TOTAL: 17.00
