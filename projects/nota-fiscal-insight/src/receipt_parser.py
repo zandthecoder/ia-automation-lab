@@ -78,10 +78,18 @@ def parse_receipt(raw_text: str) -> dict:
     calculated_receipt_total = Decimal("0")
 
     for line_number, item_line in normalized_lines[2:-1]:
-        item_fields = item_line.removeprefix("ITEM:").split("|")
-        description, quantity, unit_price, line_total = (
-            field.strip() for field in item_fields
-        )
+        item_fields = [
+            field.strip()
+            for field in item_line.removeprefix("ITEM:").split("|")
+        ]
+
+        if len(item_fields) != 4:
+            raise ReceiptValidationError(
+                code="invalid_item_format",
+                message="ITEM record must contain exactly four fields.",
+            )
+
+        description, quantity, unit_price, line_total = item_fields
 
         try:
             decimal_quantity = Decimal(quantity)
