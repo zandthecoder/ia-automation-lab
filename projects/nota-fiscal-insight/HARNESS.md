@@ -385,9 +385,9 @@ O arquivo `fixtures/inputs/invalid_empty_input.txt` possui exatamente `0 bytes`,
 
 ### FX-011 — ITEM with invalid field count
 
-**Status:** planned
+**Status:** materialized
 
-Conteúdo planejado:
+Conteúdo materializado:
 
 ```text
 MERCHANT: Mercado Exemplo
@@ -567,7 +567,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### SCN-011 — ITEM with invalid field count
 
-**Status:** planned
+**Status:** implemented and green
 
 **Given**
 
@@ -589,7 +589,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 * nenhum item parcial é adicionado ou acumulado;
 * nenhum resultado parcial é retornado.
 
-O cenário valida somente a quantidade de campos, não o conteúdo numérico. O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-011`; o futuro `TEST-011` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+O cenário valida somente o caso de três campos, não o conteúdo numérico nem outras quantidades de campos. O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-011`; `TEST-011` não verifica `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
 
 ## Test Cases
 
@@ -787,7 +787,7 @@ O cenário valida somente a quantidade de campos, não o conteúdo numérico. O 
 
 ### TEST-011 — Reject ITEM with invalid field count
 
-**Status:** planned
+**Status:** implemented and green
 
 **Covers:** `SCN-011`, `ERR-009`, `invalid_item_format`, Error Contract
 
@@ -808,8 +808,6 @@ O cenário valida somente a quantidade de campos, não o conteúdo numérico. O 
 * nenhum item inválido é adicionado à lista ou ao total acumulado;
 * nenhum requisito específico é imposto a `line_number`.
 
-`TEST-011` ainda não foi criado nem executado.
-
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -818,7 +816,7 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 `empty_input` foi promovido da lista genérica futura para o cenário formal `SCN-010` / `FX-010` / `TEST-010`, que está implementado e verde.
 
-`invalid_item_format` foi promovido da lista genérica futura para o planejamento formal `SCN-011` / `FX-011` / `TEST-011`. Esses artefatos permanecem planejados e ainda não foram implementados.
+`invalid_item_format` foi promovido da lista genérica futura para o cenário formal `SCN-011` / `FX-011` / `TEST-011`, que está implementado e verde.
 
 Exemplo de tabela futura:
 
@@ -852,13 +850,13 @@ Quando nenhuma linha lógica permanece após a normalização, `empty_input` é 
 
 Essa precedência comprovada se limita a uma sequência lógica vazia. Nesse caso, a entrada não é classificada primeiro como `missing_merchant`, `missing_date`, `missing_item`, `missing_total` ou `invalid_record_order`. Nenhuma política geral é estabelecida para entradas parcialmente preenchidas ou outras combinações de erros.
 
-### Decisão localizada planejada para SCN-011
+### Comportamento comprovado para SCN-011
 
-Quando uma linha reconhecida como `ITEM` não possui exatamente quatro campos, `invalid_item_format` deve ser emitido antes da conversão dos campos numéricos e antes das validações matemáticas.
+Quando uma linha reconhecida como `ITEM` não possui exatamente quatro campos, `invalid_item_format` é emitido antes das conversões numéricas e antes das validações matemáticas do item.
 
-Para `FX-011`, essa precedência significa que `invalid_quantity`, `line_total_mismatch`, `receipt_total_mismatch`, `missing_item` e `invalid_record_order` não devem ser emitidos primeiro. A decisão vale somente para um registro já reconhecido como `ITEM`, mas com quantidade incorreta de campos, e não estabelece uma política geral para outras combinações de erros.
+Para `FX-011`, não ocorrem antes a conversão da quantidade, do preço unitário ou do total do item, a validação de `line_total_mismatch`, a acumulação do item ou a validação do total agregado. Essa precedência comprovada se limita ao caso de três campos em um registro já reconhecido como `ITEM` e não estabelece uma política geral para outras quantidades ou combinações de erros.
 
-Uma linha `ITEM` malformada não deve entrar na lista `items`, alterar o total acumulado ou produzir dicionário parcial. O parsing deve terminar com `ReceiptValidationError`; essa é uma condição observável do contrato, não uma exigência sobre a estrutura interna do código.
+Uma linha `ITEM` malformada não entra na lista `items`, não altera o total acumulado e não produz dicionário parcial. O parsing termina com `ReceiptValidationError`; essa é uma condição observável do contrato, não uma exigência sobre a estrutura interna do código.
 
 Exemplos que ainda exigem essa definição:
 
@@ -923,10 +921,13 @@ Implemented error contract:
 * `invalid_record_order`
 * `invalid_quantity`
 * `empty_input`
+* `invalid_item_format`
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
 O contrato `empty_input` está comprovado por `SCN-010` usando uma string completamente vazia. Essa evidência não declara suporte formal para entradas contendo somente whitespace e não implementa outros códigos de registros ausentes.
+
+O contrato `invalid_item_format` está comprovado somente pelo registro `ITEM` de três campos coberto por `SCN-011`. Essa evidência não formaliza descrição ou campos vazios, formatos inválidos de outros campos nem outras quantidades de campos.
 
 Fluxo atualmente comprovado pelos testes:
 
@@ -936,14 +937,17 @@ Fluxo atualmente comprovado pelos testes:
 4. verificar se restou alguma linha lógica;
 5. emitir `empty_input` quando a sequência lógica estiver vazia;
 6. validar a sequência estrutural dos registros normalizados;
-7. extrair e limpar os valores;
-8. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
-9. converter os demais números necessários;
-10. validar o total matemático de cada item;
-11. acumular somente itens válidos;
-12. verificar se existe pelo menos um item;
-13. validar o total agregado;
-14. produzir a saída estruturada.
+7. extrair o conteúdo do registro `ITEM`;
+8. dividir e normalizar seus campos;
+9. validar que existem exatamente quatro campos;
+10. emitir `invalid_item_format` quando a quantidade de campos for incorreta;
+11. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
+12. converter os demais números necessários;
+13. validar o total matemático de cada item;
+14. acumular somente itens válidos;
+15. verificar se existe pelo menos um item;
+16. validar o total agregado;
+17. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
 
@@ -1085,7 +1089,7 @@ Somente depois que `TEST-001` passar e o diff for revisado, selecionar `SCN-002`
 
 Esta sequência foi concluída. A implementação adicionou somente uma guarda mínima de comportamento após a normalização, sem refatoração estrutural, seguindo a recomendação `No refactor now`.
 
-## Planned TDD Sequence for SCN-011
+## TDD Sequence for SCN-011
 
 1. Formalizar `SCN-011` no harness.
 2. Criar `FX-011` com um `ITEM` de três campos.
@@ -1096,11 +1100,11 @@ Esta sequência foi concluída. A implementação adicionou somente uma guarda m
 7. Registrar as evidências.
 8. Reavaliar se o processamento de `ITEM` ganhou complexidade suficiente para justificar uma pequena refatoração.
 
-Esta sequência permanece planejada e não registra suas etapas como concluídas. A fixture, o teste e a implementação ainda não existem.
+Esta sequência foi concluída. A implementação adicionou uma verificação explícita de quantidade de campos antes do desempacotamento, sem captura ampla de exceções e sem refatoração estrutural.
 
 ### Nota futura de refatoração
 
-`SCN-011` acrescentará uma validação na fronteira de parsing do item. Somente depois do Green poderá ser reavaliada a extração do processamento de um item. Nenhuma refatoração deve ocorrer antes do teste vermelho e da implementação mínima; qualquer refatoração futura deverá ser uma tarefa separada, protegida pela suíte verde.
+`SCN-011` acrescentou uma nova regra na fronteira do parsing de itens, mas nenhuma refatoração foi realizada durante o ciclo. Uma possível extração do processamento de um item poderá ser avaliada em tarefa separada; qualquer refatoração futura deverá partir da suíte verde e preservar integralmente os contratos. Esta observação não conclui que a refatoração deva ocorrer.
 
 ## TDD Workflow
 
@@ -1278,6 +1282,7 @@ Mesmo com todos os testes passando:
 | `2026-07-22` | `52ef59a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-008 passed; blank lines and external whitespace normalized while original line numbers remain preserved.` |
 | `2026-07-23` | `2e3a921`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-009 passed; invalid quantity format translated from InvalidOperation to ReceiptValidationError with code invalid_quantity.` |
 | `2026-07-23` | `315f80a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-010 passed; empty input now raises ReceiptValidationError with code empty_input instead of IndexError.` |
+| `2026-07-24` | `8a9eb8d`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-011 passed; malformed ITEM records now raise invalid_item_format before unpacking or numeric conversion.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1345,6 +1350,14 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Quando a sequência lógica está vazia, `empty_input` precede a validação dos registros obrigatórios individuais e a validação de ordem.
 * `SCN-010` foi implementado sem refatoração estrutural, seguindo a recomendação `No refactor now`.
 * `TEST-001` a `TEST-010` passam juntos.
+* `FX-011` foi materializada e revisada com a linha `ITEM: Arroz | 2 | 8.50`.
+* A linha contém três campos e não possui `line_total`.
+* `TEST-011` foi inicialmente observado vermelho porque `ValueError` escapava durante o desempacotamento.
+* O parser passou a verificar explicitamente `len(item_fields) != 4` antes do desempacotamento.
+* A linha malformada passou a emitir `ReceiptValidationError` com o código `invalid_item_format` e uma mensagem não vazia.
+* Nenhum requisito específico para `line_number` e nenhuma captura ampla de exceções foram introduzidos.
+* O item malformado não é convertido, adicionado ou acumulado.
+* `TEST-001` a `TEST-011` passam juntos.
 
 Implemented and green:
 
@@ -1358,10 +1371,11 @@ Implemented and green:
 * `TEST-008` / `SCN-008`
 * `TEST-009` / `SCN-009`
 * `TEST-010` / `SCN-010`
+* `TEST-011` / `SCN-011`
 
 Planned but not yet implemented:
 
-* `TEST-011` / `SCN-011`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -1380,14 +1394,13 @@ Structured-error scenarios:
 * `SCN-007`
 * `SCN-009`
 * `SCN-010`
+* `SCN-011`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` inaugurou uma expansão incremental das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com a expansão, `TEST-001` a `TEST-010` estão verdes.
-
-`SCN-011` é a próxima expansão incremental planejada. `FX-011` ainda não foi materializada, `TEST-011` ainda não foi criado e `invalid_item_format` ainda não foi implementado ou validado pelo harness. Os dez testes atualmente materializados permanecem verdes.
+`SCN-010` e `SCN-011` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-011` estão verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
