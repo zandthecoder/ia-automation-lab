@@ -14,6 +14,54 @@ class ReceiptValidationError(Exception):
         super().__init__(message)
 
 
+def _parse_item_record(
+    line_text: str,
+    line_number: int,
+) -> tuple[dict[str, str], Decimal]:
+    item_fields = [
+        field.strip()
+        for field in line_text.removeprefix("ITEM:").split("|")
+    ]
+
+    if len(item_fields) != 4:
+        raise ReceiptValidationError(
+            code="invalid_item_format",
+            message="ITEM record must contain exactly four fields.",
+        )
+
+    description, quantity, unit_price, line_total = item_fields
+
+    try:
+        decimal_quantity = Decimal(quantity)
+    except InvalidOperation as exc:
+        raise ReceiptValidationError(
+            code="invalid_quantity",
+            message="Quantity has an invalid or unsupported numeric format.",
+        ) from exc
+
+    decimal_unit_price = Decimal(unit_price)
+    decimal_line_total = Decimal(line_total)
+    expected_line_total = decimal_quantity * decimal_unit_price
+
+    if expected_line_total != decimal_line_total:
+        raise ReceiptValidationError(
+            code="line_total_mismatch",
+            message=(
+                "Item line total does not match quantity multiplied by unit price."
+            ),
+            line_number=line_number,
+        )
+
+    item = {
+        "description": description,
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "line_total": line_total,
+    }
+
+    return item, decimal_line_total
+
+
 def parse_receipt(raw_text: str) -> dict:
     normalized_lines: list[tuple[int, str]] = []
 
@@ -78,48 +126,9 @@ def parse_receipt(raw_text: str) -> dict:
     calculated_receipt_total = Decimal("0")
 
     for line_number, item_line in normalized_lines[2:-1]:
-        item_fields = [
-            field.strip()
-            for field in item_line.removeprefix("ITEM:").split("|")
-        ]
+        item, decimal_line_total = _parse_item_record(item_line, line_number)
 
-        if len(item_fields) != 4:
-            raise ReceiptValidationError(
-                code="invalid_item_format",
-                message="ITEM record must contain exactly four fields.",
-            )
-
-        description, quantity, unit_price, line_total = item_fields
-
-        try:
-            decimal_quantity = Decimal(quantity)
-        except InvalidOperation as exc:
-            raise ReceiptValidationError(
-                code="invalid_quantity",
-                message="Quantity has an invalid or unsupported numeric format.",
-            ) from exc
-
-        decimal_unit_price = Decimal(unit_price)
-        decimal_line_total = Decimal(line_total)
-        expected_line_total = decimal_quantity * decimal_unit_price
-
-        if expected_line_total != decimal_line_total:
-            raise ReceiptValidationError(
-                code="line_total_mismatch",
-                message=(
-                    "Item line total does not match quantity multiplied by unit price."
-                ),
-                line_number=line_number,
-            )
-
-        items.append(
-            {
-                "description": description,
-                "quantity": quantity,
-                "unit_price": unit_price,
-                "line_total": line_total,
-            }
-        )
+        items.append(item)
         calculated_receipt_total += decimal_line_total
 
     if not items:
