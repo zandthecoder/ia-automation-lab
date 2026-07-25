@@ -433,9 +433,9 @@ O arquivo `fixtures/inputs/invalid_item_description.txt` foi materializado e rev
 
 ### FX-013 — ITEM with invalid unit-price format
 
-**Status:** planned
+**Status:** materialized
 
-Conteúdo planejado:
+Conteúdo materializado:
 
 ```text
 MERCHANT: Mercado Exemplo
@@ -444,11 +444,11 @@ ITEM: Arroz | 2 | 8.5 | 17.00
 TOTAL: 17.00
 ```
 
-`FX-013` deverá isolar somente o formato lexical de `unit_price`. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, a linha `ITEM` possui exatamente quatro campos, a descrição é `"Arroz"` e a quantidade `"2"` é válida.
+`FX-013` isola somente o formato lexical de `unit_price`. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, a linha `ITEM` possui exatamente quatro campos, a descrição é `"Arroz"` e a quantidade `"2"` é válida.
 
 `unit_price` é `"8.5"`, enquanto `line_total` e `TOTAL` são `"17.00"`. Matematicamente, `2 × 8.5 == 17.0`; portanto, não existe divergência matemática intencional e `line_total_mismatch` não deve ser a causa principal.
 
-O arquivo `fixtures/inputs/invalid_unit_price.txt` ainda não existe e não deve ser materializado antes da tarefa específica de fixture.
+O arquivo `fixtures/inputs/invalid_unit_price.txt` foi materializado e revisado.
 
 ## Expected Output Manifest
 
@@ -667,7 +667,7 @@ Conceitualmente, tanto `""` quanto `"   "` são descrições vazias depois de `s
 
 ### SCN-013 — ITEM with invalid unit-price format
 
-**Status:** planned
+**Status:** implemented and green
 
 **Given**
 
@@ -703,7 +703,7 @@ Conceitualmente, tanto `""` quanto `"   "` são descrições vazias depois de `s
 
 O cenário formaliza somente `"8.5"` e não classifica a entrada como `invalid_quantity`, `line_total_mismatch`, `receipt_total_mismatch`, `invalid_item_format` ou `invalid_item_description`.
 
-O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-013`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-013` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-013`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-013` não verifica `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
 
 ## Test Cases
 
@@ -947,7 +947,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### TEST-013 — Reject unit price without two decimal places
 
-**Status:** planned
+**Status:** implemented and green
 
 **Covers:** `SCN-013`, `ERR-012`, `invalid_unit_price`, Error Contract
 
@@ -981,7 +981,7 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 `invalid_item_description` foi promovido da lista genérica futura para o cenário formal `SCN-012` / `FX-012` / `TEST-012`, que está implementado e verde.
 
-`invalid_unit_price` foi promovido da lista genérica futura para o cenário formal planejado `SCN-013` / `FX-013` / `TEST-013`. A fixture e o teste ainda não foram materializados, e o contrato ainda não foi comprovado pelo harness.
+`invalid_unit_price` foi promovido da lista genérica futura para o cenário formal `SCN-013` / `FX-013` / `TEST-013`, que está implementado e verde.
 
 Exemplo de tabela futura:
 
@@ -1049,9 +1049,9 @@ ITEM: | 2 | 8.50 | 17.00
 → invalid_item_description
 ```
 
-### Precedência planejada para SCN-013
+### Comportamento comprovado para SCN-013
 
-Para as regras atualmente cobertas de `ITEM`, a ordem localizada planejada passa a ser:
+Para as regras atualmente cobertas de `ITEM`, a ordem localizada comprovada é:
 
 ```text
 invalid_item_format
@@ -1061,17 +1061,17 @@ invalid_item_format
 → line_total_mismatch
 ```
 
-Em `SCN-013`, a quantidade de campos e a descrição já são válidas, e a quantidade também é válida. O formato lexical do preço unitário deve ser validado antes das conversões e validações que dependem desse preço. O item somente poderá ser retornado depois de todas as validações.
+Em `SCN-013`, a quantidade de campos e a descrição já são válidas, e a quantidade também é válida. O formato lexical do preço unitário é validado antes das conversões e validações que dependem desse preço. O item somente é retornado depois de todas as validações.
 
 Essa precedência está limitada ao preço `"8.5"` coberto por `SCN-013` e não estabelece uma política geral para outros campos ou formatos ainda não materializados. Um item com preço em formato inválido não entra em `items`, não altera o total acumulado, não gera item retornável e interrompe o parsing com `ReceiptValidationError`.
 
-Como `Decimal("8.5")` é válido e o cálculo `2 × 8.5` equivale a `17.00`, o Red mais provável é o parser aceitar a entrada e `TEST-013` falhar com:
+Como `Decimal("8.5")` é válido e o cálculo `2 × 8.5` equivale a `17.00`, o Red observado foi o parser aceitar a entrada e `TEST-013` falhar com:
 
 ```text
 Failed: DID NOT RAISE ReceiptValidationError
 ```
 
-Esse Red demonstrará a ausência de validação lexical do preço unitário, não uma falha de conversão decimal.
+Esse Red demonstrou a ausência de validação lexical do preço unitário, não uma falha de conversão decimal.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1138,6 +1138,7 @@ Implemented error contract:
 * `empty_input`
 * `invalid_item_format`
 * `invalid_item_description`
+* `invalid_unit_price`
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
@@ -1147,28 +1148,29 @@ O contrato `invalid_item_format` está comprovado somente pelo registro `ITEM` d
 
 O contrato `invalid_item_description` está comprovado somente pela descrição vazia coberta por `SCN-012`. Essa evidência não formaliza quantidade, preço unitário ou total do item vazios; formatos monetários inválidos; limites de tamanho da descrição; nem uma variação materializada contendo apenas espaços.
 
+O contrato `invalid_unit_price` está comprovado somente por `unit_price == "8.5"` em `SCN-013`. Essa evidência não formaliza preço vazio, negativo, zero, com três casas, com vírgula ou em notação científica, nem outros formatos monetários ainda não materializados.
+
 Fluxo atualmente comprovado pelos testes:
 
 1. enumerar as linhas brutas preservando seus números originais;
 2. remover whitespace externo;
 3. ignorar linhas vazias;
-4. verificar se restou alguma linha lógica;
-5. emitir `empty_input` quando necessário;
-6. validar a sequência estrutural;
-7. enviar cada registro `ITEM` para `_parse_item_record`;
-8. dividir e normalizar os campos;
-9. validar que existem exatamente quatro campos;
-10. emitir `invalid_item_format` quando necessário;
-11. validar que a descrição não está vazia;
-12. emitir `invalid_item_description` quando necessário;
-13. converter a quantidade para `Decimal`, traduzindo falhas para `invalid_quantity`;
-14. converter os demais números necessários;
-15. validar o total matemático do item;
-16. retornar o item validado e seu `Decimal` de total;
-17. adicionar e acumular somente depois do retorno bem-sucedido;
-18. verificar se existe pelo menos um item;
-19. validar o total agregado;
-20. produzir a saída estruturada.
+4. detectar entrada vazia;
+5. validar a sequência estrutural;
+6. enviar registros `ITEM` para `_parse_item_record`;
+7. dividir e normalizar os campos;
+8. validar exatamente quatro campos;
+9. validar a descrição;
+10. converter e validar a quantidade;
+11. validar o formato lexical de `unit_price`;
+12. converter `unit_price` para `Decimal`;
+13. converter `line_total`;
+14. validar o total matemático do item;
+15. retornar o item e seu total decimal;
+16. adicionar e acumular somente após retorno bem-sucedido;
+17. verificar a existência de itens;
+18. validar o total agregado;
+19. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
 
@@ -1343,11 +1345,11 @@ Esta sequência foi concluída. O Red demonstrou que nenhuma exceção era emiti
 
 ### Relação de SCN-013 com `_parse_item_record`
 
-A validação lexical de `unit_price` pertence às regras locais do item e sua implementação futura deverá ocorrer em `_parse_item_record`, não em `parse_receipt`. A assinatura atual do helper não deverá precisar mudar.
+A validação lexical de `unit_price` foi mantida localmente em `_parse_item_record`, sem mudança na assinatura do helper e sem transferir responsabilidade para `parse_receipt`.
 
-Nenhum conversor monetário genérico será criado antes que outros cenários demonstrem essa necessidade. `SCN-013` exige apenas a validação mínima do formato `"8.5"`.
+Nenhum helper monetário genérico foi criado. Ainda existe somente um contrato formal de formato monetário inválido; uma abstração compartilhada deve aguardar evidência de repetição, que poderá surgir em um futuro cenário de `line_total`. Nenhuma refatoração adicional ocorreu em `SCN-013`.
 
-## Planned TDD Sequence for SCN-013
+## TDD Sequence for SCN-013
 
 1. Formalizar `SCN-013` no harness.
 2. Criar `FX-013` com `unit_price` igual a `"8.5"`.
@@ -1357,7 +1359,7 @@ Nenhum conversor monetário genérico será criado antes que outros cenários de
 6. Executar `TEST-013` e a suíte completa.
 7. Registrar as evidências.
 
-Nenhuma etapa desta sequência é registrada como concluída nesta tarefa. Nenhuma fixture, teste ou implementação de `invalid_unit_price` existe ainda.
+Esta sequência foi concluída. O Red demonstrou que o parser aceitava `"8.5"` por sua conversibilidade numérica e retornava normalmente. O Green foi obtido com uma validação lexical mínima em `_parse_item_record`, antes da conversão do preço e da validação matemática.
 
 ## TDD Workflow
 
@@ -1537,6 +1539,7 @@ Mesmo com todos os testes passando:
 | `2026-07-23` | `315f80a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-010 passed; empty input now raises ReceiptValidationError with code empty_input instead of IndexError.` |
 | `2026-07-24` | `8a9eb8d`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-011 passed; malformed ITEM records now raise invalid_item_format before unpacking or numeric conversion.` |
 | `2026-07-25` | `748f1db`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-012 passed; empty ITEM descriptions now raise invalid_item_description before numeric conversion.` |
+| `2026-07-25` | `52a15c3`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-013 passed; unit_price 8.5 now raises invalid_unit_price before mathematical validation.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1620,10 +1623,15 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Nenhum contrato específico para `line_number` foi introduzido.
 * O item inválido não é retornado, adicionado ou acumulado.
 * `TEST-001` a `TEST-012` passam juntos.
-* `SCN-013` é uma nova expansão comportamental planejada para `unit_price == "8.5"`.
-* `FX-013` ainda não foi materializada.
-* `TEST-013` ainda não foi criado.
-* `invalid_unit_price` ainda não foi comprovado pelo harness.
+* `FX-013` foi materializada e revisada com a linha `ITEM: Arroz | 2 | 8.5 | 17.00`, que possui exatamente quatro campos, descrição válida e quantidade válida.
+* `Decimal("8.5")` é válido numericamente, mas `"8.5"` não satisfaz o formato monetário controlado de duas casas decimais.
+* `line_total` e `TOTAL` permanecem matematicamente consistentes.
+* `TEST-013` foi inicialmente observado vermelho porque o parser aceitava o preço e retornava a nota normalmente.
+* A validação lexical foi adicionada em `_parse_item_record` antes da conversão do preço e da validação matemática.
+* A entrada passou a emitir `ReceiptValidationError` com o código `invalid_unit_price` e uma mensagem não vazia.
+* Nenhum contrato específico para `line_number` foi introduzido.
+* O item inválido não é retornado, adicionado ou acumulado.
+* `TEST-001` a `TEST-013` passam juntos.
 
 Implemented and green:
 
@@ -1639,10 +1647,11 @@ Implemented and green:
 * `TEST-010` / `SCN-010`
 * `TEST-011` / `SCN-011`
 * `TEST-012` / `SCN-012`
+* `TEST-013` / `SCN-013`
 
 Planned but not yet implemented:
 
-* `TEST-013` / `SCN-013`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -1663,14 +1672,13 @@ Structured-error scenarios:
 * `SCN-010`
 * `SCN-011`
 * `SCN-012`
+* `SCN-013`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010`, `SCN-011` e `SCN-012` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-012` estão verdes.
-
-`SCN-013` é a próxima expansão planejada. Seus artefatos e seu comportamento ainda não estão implementados nem verdes.
+`SCN-010` a `SCN-013` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-013` estão verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
