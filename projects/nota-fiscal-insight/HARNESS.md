@@ -284,6 +284,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-010` | `fixtures/inputs/invalid_empty_input.txt`       | `SCN-010`        | Entrada completamente vazia.                   |              no |
 | `FX-011` | `fixtures/inputs/invalid_item_format.txt`       | `SCN-011`        | Linha `ITEM` com somente três campos.           |              no |
 | `FX-012` | `fixtures/inputs/invalid_item_description.txt`  | `SCN-012`        | Linha `ITEM` com descrição vazia e quatro campos. |            no |
+| `FX-013` | `fixtures/inputs/invalid_unit_price.txt`        | `SCN-013`        | Preço unitário com somente uma casa decimal.    |              no |
 
 ## Fixture Contents
 
@@ -430,6 +431,25 @@ Os demais valores permanecem válidos: `quantity == "2"`, `unit_price == "8.50"`
 
 O arquivo `fixtures/inputs/invalid_item_description.txt` foi materializado e revisado.
 
+### FX-013 — ITEM with invalid unit-price format
+
+**Status:** planned
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-13
+ITEM: Arroz | 2 | 8.5 | 17.00
+TOTAL: 17.00
+```
+
+`FX-013` deverá isolar somente o formato lexical de `unit_price`. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, a linha `ITEM` possui exatamente quatro campos, a descrição é `"Arroz"` e a quantidade `"2"` é válida.
+
+`unit_price` é `"8.5"`, enquanto `line_total` e `TOTAL` são `"17.00"`. Matematicamente, `2 × 8.5 == 17.0`; portanto, não existe divergência matemática intencional e `line_total_mismatch` não deve ser a causa principal.
+
+O arquivo `fixtures/inputs/invalid_unit_price.txt` ainda não existe e não deve ser materializado antes da tarefa específica de fixture.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -561,6 +581,7 @@ O arquivo `fixtures/inputs/invalid_item_description.txt` foi materializado e rev
 | N/A                  | `SCN-010`            | `ERR-001`, `empty_input` | `FX-010`        | N/A                  | `TEST-010`             |
 | N/A                  | `SCN-011`            | `ERR-009`, `invalid_item_format` | `FX-011` | N/A               | `TEST-011`             |
 | N/A                  | `SCN-012`            | `ERR-010`, `invalid_item_description` | `FX-012` | N/A          | `TEST-012`             |
+| N/A                  | `SCN-013`            | `ERR-012`, `invalid_unit_price` | `FX-013` | N/A               | `TEST-013`             |
 
 ## Scenario Expansion
 
@@ -643,6 +664,46 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 `SCN-012` é distinto de `SCN-011`. A linha `ITEM: Arroz | 2 | 8.50` possui somente três campos e produz `invalid_item_format`. A linha `ITEM: | 2 | 8.50 | 17.00` possui exatamente quatro campos, mas a descrição fica vazia após `strip()` e deve produzir `invalid_item_description`. A quantidade correta de separadores não torna a descrição válida.
 
 Conceitualmente, tanto `""` quanto `"   "` são descrições vazias depois de `strip()`. Entretanto, `FX-012` formaliza somente `ITEM: | 2 | 8.50 | 17.00`; uma variação contendo apenas espaços no campo não será materializada nem parametrizada neste cenário.
+
+### SCN-013 — ITEM with invalid unit-price format
+
+**Status:** planned
+
+**Given**
+
+* a nota possui `MERCHANT`, `DATE`, `ITEM` e `TOTAL` na ordem correta;
+* a linha `ITEM` contém exatamente quatro campos;
+* a descrição não está vazia;
+* a quantidade é válida;
+* `unit_price == "8.5"`;
+* `line_total == "17.00"`;
+* `receipt_total == "17.00"`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_unit_price"`;
+* `error.message` é uma string não vazia e legível;
+* nenhuma exceção técnica escapa;
+* nenhuma validação matemática é usada para aceitar o formato inválido;
+* nenhum item parcial é retornado;
+* nenhum valor é acumulado;
+* nenhum resultado parcial é retornado.
+
+`Decimal("8.5")` é convertível, mas a string `"8.5"` não possui as duas casas decimais exigidas pelo formato monetário controlado. `SCN-013` valida a representação lexical do preço, não apenas sua conversibilidade numérica:
+
+```text
+8.50 → formato válido
+8.5  → formato inválido para SCN-013
+```
+
+O cenário formaliza somente `"8.5"` e não classifica a entrada como `invalid_quantity`, `line_total_mismatch`, `receipt_total_mismatch`, `invalid_item_format` ou `invalid_item_description`.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-013`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-013` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
 
 ## Test Cases
 
@@ -884,6 +945,30 @@ Conceitualmente, tanto `""` quanto `"   "` são descrições vazias depois de `s
 * nenhum resultado parcial é retornado;
 * nenhum requisito específico é imposto a `line_number`.
 
+### TEST-013 — Reject unit price without two decimal places
+
+**Status:** planned
+
+**Covers:** `SCN-013`, `ERR-012`, `invalid_unit_price`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-013`
+
+**Expected error:** `invalid_unit_price`
+
+**Pass condition:**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_unit_price"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* nenhuma exceção técnica escapa;
+* o parser não retorna normalmente;
+* nenhum item inválido é retornado;
+* nenhum resultado parcial é retornado;
+* nenhum requisito específico é imposto a `line_number`.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -896,6 +981,8 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 `invalid_item_description` foi promovido da lista genérica futura para o cenário formal `SCN-012` / `FX-012` / `TEST-012`, que está implementado e verde.
 
+`invalid_unit_price` foi promovido da lista genérica futura para o cenário formal planejado `SCN-013` / `FX-013` / `TEST-013`. A fixture e o teste ainda não foram materializados, e o contrato ainda não foi comprovado pelo harness.
+
 Exemplo de tabela futura:
 
 | Error code                 | Synthetic input condition |
@@ -906,7 +993,6 @@ Exemplo de tabela futura:
 | `missing_date`             | ausência de `DATE`        |
 | `duplicate_date`           | duas linhas `DATE`        |
 | `invalid_date`             | `2026-02-30`              |
-| `invalid_unit_price`       | preço `8.5`               |
 | `invalid_line_total`       | total `-1.00`             |
 | `missing_total`            | ausência de `TOTAL`       |
 | `duplicate_total`          | duas linhas `TOTAL`       |
@@ -962,6 +1048,30 @@ ITEM: Arroz | 2 | 8.50
 ITEM: | 2 | 8.50 | 17.00
 → invalid_item_description
 ```
+
+### Precedência planejada para SCN-013
+
+Para as regras atualmente cobertas de `ITEM`, a ordem localizada planejada passa a ser:
+
+```text
+invalid_item_format
+→ invalid_item_description
+→ invalid_quantity
+→ invalid_unit_price
+→ line_total_mismatch
+```
+
+Em `SCN-013`, a quantidade de campos e a descrição já são válidas, e a quantidade também é válida. O formato lexical do preço unitário deve ser validado antes das conversões e validações que dependem desse preço. O item somente poderá ser retornado depois de todas as validações.
+
+Essa precedência está limitada ao preço `"8.5"` coberto por `SCN-013` e não estabelece uma política geral para outros campos ou formatos ainda não materializados. Um item com preço em formato inválido não entra em `items`, não altera o total acumulado, não gera item retornável e interrompe o parsing com `ReceiptValidationError`.
+
+Como `Decimal("8.5")` é válido e o cálculo `2 × 8.5` equivale a `17.00`, o Red mais provável é o parser aceitar a entrada e `TEST-013` falhar com:
+
+```text
+Failed: DID NOT RAISE ReceiptValidationError
+```
+
+Esse Red demonstrará a ausência de validação lexical do preço unitário, não uma falha de conversão decimal.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1231,6 +1341,24 @@ A extração anterior continua preservando os contratos, conforme confirmado pel
 
 Esta sequência foi concluída. O Red demonstrou que nenhuma exceção era emitida e que o item com descrição vazia era aceito. O Green foi obtido com uma guarda mínima dentro de `_parse_item_record`, depois de `invalid_item_format` e antes das conversões numéricas.
 
+### Relação de SCN-013 com `_parse_item_record`
+
+A validação lexical de `unit_price` pertence às regras locais do item e sua implementação futura deverá ocorrer em `_parse_item_record`, não em `parse_receipt`. A assinatura atual do helper não deverá precisar mudar.
+
+Nenhum conversor monetário genérico será criado antes que outros cenários demonstrem essa necessidade. `SCN-013` exige apenas a validação mínima do formato `"8.5"`.
+
+## Planned TDD Sequence for SCN-013
+
+1. Formalizar `SCN-013` no harness.
+2. Criar `FX-013` com `unit_price` igual a `"8.5"`.
+3. Criar `TEST-013`.
+4. Executar `TEST-013` e observar o Red.
+5. Implementar validação lexical mínima em `_parse_item_record`.
+6. Executar `TEST-013` e a suíte completa.
+7. Registrar as evidências.
+
+Nenhuma etapa desta sequência é registrada como concluída nesta tarefa. Nenhuma fixture, teste ou implementação de `invalid_unit_price` existe ainda.
+
 ## TDD Workflow
 
 Para cada comportamento:
@@ -1492,6 +1620,10 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Nenhum contrato específico para `line_number` foi introduzido.
 * O item inválido não é retornado, adicionado ou acumulado.
 * `TEST-001` a `TEST-012` passam juntos.
+* `SCN-013` é uma nova expansão comportamental planejada para `unit_price == "8.5"`.
+* `FX-013` ainda não foi materializada.
+* `TEST-013` ainda não foi criado.
+* `invalid_unit_price` ainda não foi comprovado pelo harness.
 
 Implemented and green:
 
@@ -1510,7 +1642,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-013` / `SCN-013`
 
 ### Resumo dos artefatos cobertos
 
@@ -1537,6 +1669,8 @@ Structured-error scenarios:
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
 `SCN-010`, `SCN-011` e `SCN-012` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-012` estão verdes.
+
+`SCN-013` é a próxima expansão planejada. Seus artefatos e seu comportamento ainda não estão implementados nem verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
