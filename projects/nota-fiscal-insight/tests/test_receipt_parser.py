@@ -51,6 +51,9 @@ INVALID_EMPTY_INPUT_FIXTURE_PATH = (
 INVALID_ITEM_FORMAT_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_item_format.txt"
 )
+INVALID_ITEM_DESCRIPTION_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_item_description.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -188,5 +191,18 @@ def test_reject_item_with_invalid_field_count():
     error = exc_info.value
 
     assert error.code == "invalid_item_format"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_item_with_empty_description():
+    raw_text = INVALID_ITEM_DESCRIPTION_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "invalid_item_description"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
