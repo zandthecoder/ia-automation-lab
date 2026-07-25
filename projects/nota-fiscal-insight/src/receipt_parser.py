@@ -31,6 +31,12 @@ def _parse_item_record(
 
     description, quantity, unit_price, line_total = item_fields
 
+    if not description:
+        raise ReceiptValidationError(
+            code="invalid_item_description",
+            message="Item description cannot be empty.",
+        )
+
     try:
         decimal_quantity = Decimal(quantity)
     except InvalidOperation as exc:
