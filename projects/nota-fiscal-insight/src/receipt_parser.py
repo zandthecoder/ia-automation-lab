@@ -45,6 +45,18 @@ def _parse_item_record(
             message="Quantity has an invalid or unsupported numeric format.",
         ) from exc
 
+    whole_unit_price, separator, fractional_unit_price = unit_price.partition(".")
+
+    if (
+        not whole_unit_price
+        or separator != "."
+        or len(fractional_unit_price) != 2
+    ):
+        raise ReceiptValidationError(
+            code="invalid_unit_price",
+            message="Unit price must have exactly two decimal places.",
+        )
+
     decimal_unit_price = Decimal(unit_price)
     decimal_line_total = Decimal(line_total)
     expected_line_total = decimal_quantity * decimal_unit_price
