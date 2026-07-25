@@ -283,6 +283,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-009` | `fixtures/inputs/invalid_numeric_format.txt`    | `SCN-009`        | Quantidade ou valor com formato não suportado. |              no |
 | `FX-010` | `fixtures/inputs/invalid_empty_input.txt`       | `SCN-010`        | Entrada completamente vazia.                   |              no |
 | `FX-011` | `fixtures/inputs/invalid_item_format.txt`       | `SCN-011`        | Linha `ITEM` com somente três campos.           |              no |
+| `FX-012` | `fixtures/inputs/invalid_item_description.txt`  | `SCN-012`        | Linha `ITEM` com descrição vazia e quatro campos. |            no |
 
 ## Fixture Contents
 
@@ -409,6 +410,25 @@ description | quantity | unit_price
 ```
 
 A fixture isola a quantidade incorreta de campos: `MERCHANT`, `DATE`, ordem, prefixo `ITEM:` e formato de `TOTAL` permanecem válidos para o formato controlado. Como `line_total` está ausente, o parser não deve chegar à conversão numérica ou à validação matemática do item, e não se avalia se `TOTAL: 17.00` corresponde a um item que não pode ser construído validamente.
+
+### FX-012 — ITEM with empty description
+
+**Status:** planned
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-12
+ITEM: | 2 | 8.50 | 17.00
+TOTAL: 17.00
+```
+
+`FX-012` deverá isolar somente a descrição vazia. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida e existe exatamente um registro `ITEM`. A linha `ITEM` possui exatamente quatro campos separados por `|`, mas o primeiro campo se torna `""` depois de `strip()`.
+
+Os demais valores permanecem válidos: `quantity == "2"`, `unit_price == "8.50"`, `line_total == "17.00"`, `2 × 8.50 == 17.00` e `TOTAL: 17.00` é consistente. Portanto, a entrada não deve ser classificada como `invalid_item_format`, `invalid_quantity`, `line_total_mismatch`, `receipt_total_mismatch`, `missing_item` ou `invalid_record_order`.
+
+O arquivo `fixtures/inputs/invalid_item_description.txt` ainda não existe e não deve ser materializado antes da tarefa específica de fixture.
 
 ## Expected Output Manifest
 
@@ -540,6 +560,7 @@ A fixture isola a quantidade incorreta de campos: `MERCHANT`, `DATE`, ordem, pre
 | `AC-014`             | Todos                | `DEC-004`             | Todas              | Todas aplicáveis     | Suíte completa         |
 | N/A                  | `SCN-010`            | `ERR-001`, `empty_input` | `FX-010`        | N/A                  | `TEST-010`             |
 | N/A                  | `SCN-011`            | `ERR-009`, `invalid_item_format` | `FX-011` | N/A               | `TEST-011`             |
+| N/A                  | `SCN-012`            | `ERR-010`, `invalid_item_description` | `FX-012` | N/A          | `TEST-012`             |
 
 ## Scenario Expansion
 
@@ -590,6 +611,38 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 * nenhum resultado parcial é retornado.
 
 O cenário valida somente o caso de três campos, não o conteúdo numérico nem outras quantidades de campos. O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-011`; `TEST-011` não verifica `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+### SCN-012 — ITEM with empty description
+
+**Status:** planned
+
+**Given**
+
+* a nota possui `MERCHANT`, `DATE`, `ITEM` e `TOTAL` na ordem correta;
+* a linha `ITEM` contém exatamente quatro campos separados por `|`;
+* o campo `description` fica vazio depois da remoção de whitespace externo;
+* `quantity`, `unit_price` e `line_total` são válidos;
+* o total da nota é consistente com os valores declarados.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_item_description"`;
+* `error.message` é uma string não vazia e legível;
+* nenhuma conversão numérica é necessária antes de detectar o erro;
+* nenhum item parcial é adicionado;
+* nenhum valor é acumulado;
+* nenhum resultado parcial é retornado.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-012`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-012` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+`SCN-012` é distinto de `SCN-011`. A linha `ITEM: Arroz | 2 | 8.50` possui somente três campos e produz `invalid_item_format`. A linha `ITEM: | 2 | 8.50 | 17.00` possui exatamente quatro campos, mas a descrição fica vazia após `strip()` e deve produzir `invalid_item_description`. A quantidade correta de separadores não torna a descrição válida.
+
+Conceitualmente, tanto `""` quanto `"   "` são descrições vazias depois de `strip()`. Entretanto, `FX-012` formaliza somente `ITEM: | 2 | 8.50 | 17.00`; uma variação contendo apenas espaços no campo não será materializada nem parametrizada neste cenário.
 
 ## Test Cases
 
@@ -808,6 +861,29 @@ O cenário valida somente o caso de três campos, não o conteúdo numérico nem
 * nenhum item inválido é adicionado à lista ou ao total acumulado;
 * nenhum requisito específico é imposto a `line_number`.
 
+### TEST-012 — Reject ITEM with empty description
+
+**Status:** planned
+
+**Covers:** `SCN-012`, `ERR-010`, `invalid_item_description`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-012`
+
+**Expected error:** `invalid_item_description`
+
+**Pass condition:**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_item_description"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* nenhuma outra exceção técnica escapa;
+* nenhum item inválido é retornado;
+* nenhum resultado parcial é retornado;
+* nenhum requisito específico é imposto a `line_number`.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -817,6 +893,8 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 `empty_input` foi promovido da lista genérica futura para o cenário formal `SCN-010` / `FX-010` / `TEST-010`, que está implementado e verde.
 
 `invalid_item_format` foi promovido da lista genérica futura para o cenário formal `SCN-011` / `FX-011` / `TEST-011`, que está implementado e verde.
+
+`invalid_item_description` foi promovido da lista genérica futura para o cenário formal planejado `SCN-012` / `FX-012` / `TEST-012`. A fixture e o teste ainda não foram materializados, e o contrato ainda não foi validado pelo harness.
 
 Exemplo de tabela futura:
 
@@ -828,7 +906,6 @@ Exemplo de tabela futura:
 | `missing_date`             | ausência de `DATE`        |
 | `duplicate_date`           | duas linhas `DATE`        |
 | `invalid_date`             | `2026-02-30`              |
-| `invalid_item_description` | descrição vazia           |
 | `invalid_unit_price`       | preço `8.5`               |
 | `invalid_line_total`       | total `-1.00`             |
 | `missing_total`            | ausência de `TOTAL`       |
@@ -857,6 +934,24 @@ Quando uma linha reconhecida como `ITEM` não possui exatamente quatro campos, `
 Para `FX-011`, não ocorrem antes a conversão da quantidade, do preço unitário ou do total do item, a validação de `line_total_mismatch`, a acumulação do item ou a validação do total agregado. Essa precedência comprovada se limita ao caso de três campos em um registro já reconhecido como `ITEM` e não estabelece uma política geral para outras quantidades ou combinações de erros.
 
 Uma linha `ITEM` malformada não entra na lista `items`, não altera o total acumulado e não produz dicionário parcial. O parsing termina com `ReceiptValidationError`; essa é uma condição observável do contrato, não uma exigência sobre a estrutura interna do código.
+
+### Precedência planejada para SCN-012
+
+Quando uma linha reconhecida como `ITEM` possui exatamente quatro campos, mas a descrição fica vazia depois da normalização, `invalid_item_description` deverá ser emitido depois da validação da quantidade de campos e antes das conversões numéricas.
+
+A ordem localizada planejada é:
+
+1. dividir e normalizar os campos;
+2. validar que existem exatamente quatro campos;
+3. validar que a descrição não está vazia;
+4. converter a quantidade;
+5. converter os valores monetários;
+6. validar o total matemático do item;
+7. retornar o item validado.
+
+Essa ordem preserva `invalid_item_format` antes de `invalid_item_description` quando a quantidade de campos estiver incorreta. Para o caso de quatro campos com descrição vazia, `invalid_item_description` precede `invalid_quantity`, `line_total_mismatch`, a acumulação do item e `receipt_total_mismatch`.
+
+Essa precedência está limitada ao cenário de descrição vazia. Um item rejeitado não entra em `items`, não altera o total acumulado, não gera dicionário retornável e interrompe o parsing com `ReceiptValidationError`; trata-se de uma condição observável, sem impor uma estrutura interna específica.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1102,9 +1197,23 @@ Esta sequência foi concluída. A implementação adicionou somente uma guarda m
 
 Esta sequência foi concluída. A implementação adicionou uma verificação explícita de quantidade de campos antes do desempacotamento, sem captura ampla de exceções e sem refatoração estrutural.
 
-### Nota futura de refatoração
+### Relação com a refatoração de ITEM
 
-`SCN-011` acrescentou uma nova regra na fronteira do parsing de itens, mas nenhuma refatoração foi realizada durante o ciclo. Uma possível extração do processamento de um item poderá ser avaliada em tarefa separada; qualquer refatoração futura deverá partir da suíte verde e preservar integralmente os contratos. Esta observação não conclui que a refatoração deva ocorrer.
+`_parse_item_record` já concentra as regras locais de parsing e validação de um item, e `invalid_item_description` pertence naturalmente a essa fronteira. A validação futura não deverá voltar a ser colocada diretamente em `parse_receipt`.
+
+A extração anterior preservou os contratos existentes e não altera o contrato planejado de `SCN-012`. A implementação futura continuará sendo precedida pela materialização de `FX-012`, pela criação de `TEST-012` e pela observação do Red. A assinatura do helper permanece inalterada nesta tarefa.
+
+## Planned TDD Sequence for SCN-012
+
+1. Formalizar `SCN-012` no harness.
+2. Criar `FX-012` com descrição vazia e quatro campos.
+3. Criar `TEST-012`.
+4. Executar `TEST-012` e observar o Red.
+5. Implementar a validação mínima dentro de `_parse_item_record`.
+6. Executar `TEST-012` e a suíte completa.
+7. Registrar as evidências.
+
+Somente a primeira etapa está sendo realizada nesta tarefa. Nenhuma fixture, teste ou implementação de `invalid_item_description` existe ainda.
 
 ## TDD Workflow
 
@@ -1358,6 +1467,11 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Nenhum requisito específico para `line_number` e nenhuma captura ampla de exceções foram introduzidos.
 * O item malformado não é convertido, adicionado ou acumulado.
 * `TEST-001` a `TEST-011` passam juntos.
+* A extração do processamento de `ITEM` para `_parse_item_record` preservou os 11 testes existentes.
+* `SCN-012` é uma nova expansão comportamental planejada para descrição vazia.
+* `FX-012` ainda não foi materializada.
+* `TEST-012` ainda não foi criado.
+* `invalid_item_description` ainda não foi validado pelo harness.
 
 Implemented and green:
 
@@ -1375,7 +1489,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-012` / `SCN-012`
 
 ### Resumo dos artefatos cobertos
 
@@ -1401,6 +1515,8 @@ Structured-error scenarios:
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
 `SCN-010` e `SCN-011` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-011` estão verdes.
+
+`SCN-012` é a próxima expansão planejada. Seus artefatos e seu comportamento ainda não estão implementados nem verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
