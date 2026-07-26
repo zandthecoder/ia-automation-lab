@@ -57,6 +57,9 @@ INVALID_ITEM_DESCRIPTION_FIXTURE_PATH = (
 INVALID_UNIT_PRICE_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_unit_price.txt"
 )
+NEGATIVE_LINE_TOTAL_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "negative_line_total.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -220,5 +223,18 @@ def test_reject_unit_price_without_two_decimal_places():
     error = exc_info.value
 
     assert error.code == "invalid_unit_price"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_negative_line_total():
+    raw_text = NEGATIVE_LINE_TOTAL_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "invalid_line_total"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
