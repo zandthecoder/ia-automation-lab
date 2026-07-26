@@ -163,7 +163,14 @@ def parse_receipt(raw_text: str) -> dict:
         )
 
     receipt_total = total_line.removeprefix("TOTAL:").strip()
-    decimal_receipt_total = Decimal(receipt_total)
+
+    try:
+        decimal_receipt_total = Decimal(receipt_total)
+    except InvalidOperation as exc:
+        raise ReceiptValidationError(
+            code="invalid_receipt_total",
+            message="Receipt total has an invalid numeric format.",
+        ) from exc
 
     if calculated_receipt_total != decimal_receipt_total:
         raise ReceiptValidationError(
