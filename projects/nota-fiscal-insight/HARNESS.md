@@ -517,9 +517,9 @@ O arquivo `fixtures/inputs/invalid_line_total_format.txt` foi materializado e re
 
 ### FX-017 — ITEM with non-convertible unit price
 
-**Status:** planned
+**Status:** materialized
 
-Conteúdo planejado:
+Conteúdo:
 
 ```text
 MERCHANT: Mercado Exemplo
@@ -528,11 +528,11 @@ ITEM: Arroz | 1 | ab.cd | 10.00
 TOTAL: 10.00
 ```
 
-`FX-017` deve isolar somente a conversão de `unit_price`. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, existe exatamente um registro `ITEM` com quatro campos, `description == "Arroz"` e `quantity == "1"` é válida. `unit_price == "ab.cd"` possui uma parte antes do ponto, um ponto e exatamente dois caracteres depois do ponto, mas não é convertível para `Decimal`.
+`FX-017` isola somente a conversão de `unit_price`. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, existe exatamente um registro `ITEM` com quatro campos, `description == "Arroz"` e `quantity == "1"` é válida. `unit_price == "ab.cd"` possui uma parte antes do ponto, um ponto e exatamente dois caracteres depois do ponto, mas não é convertível para `Decimal`.
 
-`line_total == "10.00"` é convertível e não negativo, e `TOTAL == "10.00"` também é convertível. Não existe outro erro estrutural intencional. O parser deve falhar na conversão do preço antes de converter `line_total` ou executar a comparação matemática.
+`line_total == "10.00"` é convertível e não negativo, e `TOTAL == "10.00"` também é convertível. Não existe outro erro estrutural intencional. O parser falha na conversão do preço antes de converter `line_total` ou executar a comparação matemática.
 
-O arquivo planejado é `fixtures/inputs/non_convertible_unit_price.txt`. `FX-017` ainda não foi materializada.
+O arquivo `fixtures/inputs/non_convertible_unit_price.txt` foi materializado e revisado.
 
 ## Expected Output Manifest
 
@@ -970,7 +970,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### SCN-017 — ITEM with non-convertible unit price
 
-**Status:** planned
+**Status:** implemented and green
 
 **Given**
 
@@ -1361,7 +1361,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### TEST-017 — Reject non-convertible unit price
 
-**Status:** planned
+**Status:** implemented and green
 
 **Covers:** `SCN-017`, `ERR-012`, `invalid_unit_price`, Error Contract
 
@@ -1405,7 +1405,7 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 O caso não convertível de `invalid_line_total` foi promovido para o cenário formal `SCN-016` / `FX-016` / `TEST-016`, que está materializado, implementado e verde. O mesmo código possui dois cenários independentes: `SCN-014` comprova o valor negativo, enquanto `SCN-016` comprova a falha de conversão. O contrato comprovado de `SCN-014` permanece inalterado.
 
-O caso não convertível de `invalid_unit_price` foi promovido para o cenário formal planejado `SCN-017` / `FX-017` / `TEST-017`. `SCN-013` continua comprovando separadamente a forma lexical com uma casa decimal; a tradução da falha de conversão ainda não foi materializada ou testada.
+O caso não convertível de `invalid_unit_price` foi promovido para o cenário formal `SCN-017` / `FX-017` / `TEST-017`, que está materializado, implementado e verde. `SCN-013` continua comprovando separadamente a forma lexical com uma casa decimal, enquanto `SCN-017` comprova a tradução da falha de conversão.
 
 Exemplo de tabela futura:
 
@@ -1586,9 +1586,9 @@ O bloco `try` envolve somente `Decimal(line_total)` e captura apenas `InvalidOpe
 
 Como `_parse_item_record` lança antes de retornar, nenhum dicionário inválido chega a `parse_receipt`, `items.append(...)` não é executado, o acumulador não é atualizado e o registro `TOTAL` não é processado. Nenhum rollback manual é necessário.
 
-### Precedência planejada para SCN-017
+### Precedência comprovada para SCN-017
 
-O fluxo localizado de `ITEM` que deverá ser preservado é:
+O fluxo localizado de `ITEM` comprovado é:
 
 ```text
 invalid_item_format
@@ -1602,11 +1602,29 @@ invalid_item_format
 → line_total_mismatch
 ```
 
-Para `SCN-017`, os quatro campos são confirmados, a descrição é validada e a quantidade é convertida. A guarda lexical superficial do preço é satisfeita; em seguida, a conversão de `unit_price` é tentada e `InvalidOperation` deverá ser traduzida para `invalid_unit_price`. `line_total` não deverá ser convertido, a comparação matemática não deverá ser executada e `_parse_item_record` não deverá retornar um item.
+Para `SCN-017`, os quatro campos são confirmados, a descrição é validada e a quantidade é convertida. A guarda lexical superficial do preço é satisfeita; em seguida, `_convert_decimal` tenta converter `unit_price` e traduz `InvalidOperation` para `invalid_unit_price`. `line_total` não é convertido, a comparação matemática não é executada e `_parse_item_record` não retorna um item.
 
-O Red mais provável é `decimal.InvalidOperation` escapar da execução direta de `Decimal(unit_price)` antes que `TEST-017` receba uma `ReceiptValidationError`. Esse Red demonstrará que a guarda lexical não garante conversibilidade, que ainda falta a tradução pública e que `line_total_mismatch` não é alcançado.
+O Red observado foi `decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]` escapar da execução direta de `Decimal(unit_price)` antes que `TEST-017` recebesse uma `ReceiptValidationError`. Esse Red demonstrou que a guarda lexical não garante conversibilidade e que o tipo técnico atravessava a fronteira pública; `line_total_mismatch` não era alcançado.
 
-`_convert_decimal` já existe e traduz somente `InvalidOperation`; ele não executa validação lexical. A guarda de `unit_price` deverá continuar na posição atual, antes da conversão. Uma implementação futura poderá usar o helper somente para converter o preço, mantendo `invalid_unit_price` e sua mensagem explícitos no chamador. Nenhuma nova abstração ou alteração de assinatura é necessária para `SCN-017`.
+`InvalidOperation` é uma exceção técnica da biblioteca `decimal`; consumidores de `parse_receipt` recebem o contrato público do parser. A tradução comprovada é:
+
+```text
+decimal.InvalidOperation
+→ ReceiptValidationError(code="invalid_unit_price")
+```
+
+O código identifica o campo responsável, a causa técnica permanece encadeada internamente por `from exc` e nenhuma captura genérica foi adicionada. Essa evidência não declara que todos os formatos inválidos de preço estão formalmente cobertos.
+
+`_convert_decimal` permaneceu com responsabilidade exclusivamente técnica: converter o valor, capturar `InvalidOperation`, lançar o contrato indicado pelo chamador e preservar a causa. O helper não conhece `unit_price`, não valida duas casas decimais e não escolhe código ou mensagem. A guarda lexical continua dentro de `_parse_item_record`, antes da conversão; `invalid_unit_price` e a mensagem permanecem explícitos na chamada. A assinatura do helper não mudou, e `SCN-017` validou um novo uso sem alterar seu contrato.
+
+Os dois caminhos comprovados de `invalid_unit_price` permanecem independentes:
+
+1. `SCN-013`, com `unit_price == "8.5"`: o valor é convertível, mas a guarda lexical rejeita a única casa decimal antes de `_convert_decimal`;
+2. `SCN-017`, com `unit_price == "ab.cd"`: a forma superficial possui ponto e dois caracteres posteriores, mas `_convert_decimal` traduz a falha de conversão.
+
+As mensagens não precisam ser idênticas. Em contraste, `ITEM: Arroz | 2 | 8.50 | 16.00` possui campos numericamente válidos e produz `line_total_mismatch`; `ITEM: Arroz | 1 | ab.cd | 10.00` não possui preço decimal válido e produz `invalid_unit_price` antes de qualquer comparação matemática.
+
+Como `_convert_decimal` lança antes de `_parse_item_record` retornar, nenhum item inválido chega a `parse_receipt`, `items.append(...)` não é executado, o acumulador não é atualizado e o registro `TOTAL` não é processado. Nenhum rollback manual é necessário.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1685,7 +1703,7 @@ O contrato `invalid_item_format` está comprovado somente pelo registro `ITEM` d
 
 O contrato `invalid_item_description` está comprovado somente pela descrição vazia coberta por `SCN-012`. Essa evidência não formaliza quantidade, preço unitário ou total do item vazios; formatos monetários inválidos; limites de tamanho da descrição; nem uma variação materializada contendo apenas espaços.
 
-O contrato `invalid_unit_price` está comprovado somente por `unit_price == "8.5"` em `SCN-013`. `SCN-017` planeja ampliar essa comprovação para `unit_price == "ab.cd"`, mas ainda não foi materializado ou testado. A evidência atual não formaliza preço vazio, negativo, zero, com três casas, com vírgula ou em notação científica, nem outros formatos monetários ainda não materializados.
+O contrato `invalid_unit_price` está comprovado por dois cenários independentes: `SCN-013`, com `unit_price == "8.5"` convertível, mas sem duas casas decimais, e `SCN-017`, com `unit_price == "ab.cd"` superficialmente compatível com a guarda lexical, mas não convertível. Essa evidência não formaliza preço vazio, negativo, zero, com três casas, com vírgula ou em notação científica, nem outros formatos monetários ainda não materializados.
 
 O contrato `invalid_line_total` está comprovado por dois cenários independentes: `SCN-014`, com `line_total == "-1.00"` convertível e negativo, e `SCN-016`, com `line_total == "abc"` não convertível. Essa evidência não formaliza `line_total == "0.00"`, campo vazio ou vírgula decimal em `line_total`, quantidade negativa, preço unitário negativo, `invalid_receipt_total` ou `TOTAL` negativo isoladamente.
 
@@ -1700,16 +1718,16 @@ Fluxo atualmente comprovado pelos testes:
 5. validar exatamente quatro campos;
 6. validar a descrição;
 7. converter e validar a quantidade;
-8. validar e converter `unit_price`;
-9. tentar converter `line_total`;
-10. traduzir `InvalidOperation` dessa conversão para `invalid_line_total`;
-11. rejeitar `line_total` negativo;
-12. validar `quantity × unit_price == line_total`;
-13. retornar o item e seu total decimal;
-14. adicionar e acumular somente após retorno bem-sucedido;
-15. verificar a existência de pelo menos um item;
-16. converter e validar o registro `TOTAL`;
-17. comparar o total declarado com o total acumulado;
+8. validar lexicalmente `unit_price`;
+9. converter `unit_price` usando `_convert_decimal`;
+10. traduzir falhas dessa conversão para `invalid_unit_price`;
+11. converter `line_total`;
+12. traduzir falhas dessa conversão para `invalid_line_total`;
+13. rejeitar `line_total` negativo;
+14. validar o total matemático do item;
+15. retornar e acumular somente itens totalmente válidos;
+16. converter o total agregado usando `_convert_decimal`;
+17. validar o total agregado;
 18. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
@@ -1958,9 +1976,9 @@ Esta sequência foi concluída. `TEST-015` foi inicialmente observado vermelho p
 
 Esta sequência foi concluída. `TEST-016` foi inicialmente observado vermelho porque `InvalidOperation` escapava da conversão de `line_total`. O Green foi obtido com a tradução localizada para `invalid_line_total`, e `TEST-001` a `TEST-016` passam juntos.
 
-`TASK-REVIEW-003` recomendou inicialmente manter as validações numéricas localizadas. Depois do terceiro bloco comprovado, `TASK-REVIEW-004` recomendou extrair a conversão mínima, e `TASK-REFACTOR-002` criou `_convert_decimal` sem mover regras lexicais, semânticas ou matemáticas. O helper atende `quantity`, `line_total` e `receipt_total`; `unit_price` continua com conversão direta até a implementação futura de `SCN-017`.
+`TASK-REVIEW-003` recomendou inicialmente manter as validações numéricas localizadas. Depois do terceiro bloco comprovado, `TASK-REVIEW-004` recomendou extrair a conversão mínima, e `TASK-REFACTOR-002` criou `_convert_decimal` sem mover regras lexicais, semânticas ou matemáticas. O helper atende `quantity`, `unit_price`, `line_total` e `receipt_total`; a guarda lexical do preço permanece localizada em `_parse_item_record`.
 
-## Planned TDD Sequence for SCN-017
+## TDD Sequence for SCN-017
 
 1. Formalizar `SCN-017` no harness.
 2. Criar `FX-017` com `unit_price` igual a `"ab.cd"`.
@@ -1973,7 +1991,7 @@ Esta sequência foi concluída. `TEST-016` foi inicialmente observado vermelho p
 9. Executar a suíte completa.
 10. Registrar as evidências.
 
-Somente a primeira etapa está concluída. `FX-017`, `TEST-017` e a tradução da conversão inválida de `unit_price` ainda não existem.
+Esta sequência foi concluída. `TEST-017` foi inicialmente observado vermelho porque `InvalidOperation` escapava da conversão direta de `unit_price`. O Green foi obtido ao usar `_convert_decimal` somente nessa conversão, preservando a guarda lexical, e `TEST-001` a `TEST-017` passam juntos.
 
 ## TDD Workflow
 
@@ -2158,8 +2176,9 @@ Mesmo com todos os testes passando:
 | `2026-07-25` | `07d1373`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-015 passed; invalid receipt totals now translate InvalidOperation to invalid_receipt_total.` |
 | `2026-07-25` | `9b7c759`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass (warning)`  | `TEST-001 through TEST-015 passed; pytest could not create .pytest_cache due to WinError 5; SCN-016 remains planned.` |
 | `2026-07-26` | `d7fd01a`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-016 passed; non-convertible line totals now translate InvalidOperation to invalid_line_total.` |
+| `2026-07-26` | `a6f49e0`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-017 passed; non-convertible unit prices now translate InvalidOperation to invalid_unit_price.` |
 
-Na validação de `2026-07-26`, o pytest também informou que não pôde criar `.pytest_cache` devido a `WinError 5`; o warning ambiental foi não bloqueante e os dezesseis testes passaram.
+Na validação de `2026-07-26`, o pytest também informou que não pôde criar `.pytest_cache` devido a `WinError 5`; o warning ambiental foi não bloqueante e os dezessete testes passaram.
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -2284,12 +2303,17 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `SCN-014` comprova separadamente o valor negativo, e `SCN-004` comprova separadamente a divergência matemática.
 * Nenhum helper ou refatoração adicional foi introduzido.
 * `TEST-001` a `TEST-016` passam juntos.
-* `SCN-017` é uma nova expansão comportamental planejada para `unit_price == "ab.cd"`.
-* `FX-017` ainda não foi materializada.
-* `TEST-017` ainda não foi criado.
-* A tradução da conversão inválida de `unit_price` ainda não foi comprovada.
-* `SCN-013` comprova separadamente a forma lexical incorreta com uma casa decimal.
-* `_convert_decimal` já existe, mas ainda não é usado para `unit_price`; nenhuma nova abstração é necessária.
+* `FX-017` foi materializada e revisada em `fixtures/inputs/non_convertible_unit_price.txt`, com quatro campos e `unit_price == "ab.cd"`; descrição e quantidade são válidas.
+* A forma superficial do preço possui conteúdo antes do ponto e dois caracteres posteriores, portanto satisfaz a guarda lexical existente, mas `Decimal("ab.cd")` produz `InvalidOperation`.
+* `TEST-017` foi inicialmente observado vermelho porque `InvalidOperation` escapava da interface pública.
+* A guarda lexical foi preservada na posição original, antes da conversão.
+* Somente a conversão de `unit_price` passou a usar `_convert_decimal`, com o código `invalid_unit_price` e a mensagem explícitos no chamador.
+* A interface pública agora emite `ReceiptValidationError` com `error.code == "invalid_unit_price"` e uma mensagem não vazia.
+* `TEST-017` não estabelece requisito específico para `line_number`.
+* Quando a conversão falha, `line_total` não é convertido, a validação matemática não é alcançada e nenhum item inválido é retornado, adicionado ou acumulado.
+* `SCN-013` continua comprovando separadamente a forma lexical incorreta com uma casa decimal.
+* `_convert_decimal` não foi modificado, nenhum helper adicional foi criado e nenhuma refatoração adicional ocorreu.
+* `TEST-001` a `TEST-017` passam juntos.
 
 Implemented and green:
 
@@ -2309,10 +2333,11 @@ Implemented and green:
 * `TEST-014` / `SCN-014`
 * `TEST-015` / `SCN-015`
 * `TEST-016` / `SCN-016`
+* `TEST-017` / `SCN-017`
 
 Planned but not yet implemented:
 
-* `TEST-017` / `SCN-017`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -2337,14 +2362,15 @@ Structured-error scenarios:
 * `SCN-014`
 * `SCN-015`
 * `SCN-016`
+* `SCN-017`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-017` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-016` estão verdes.
+`SCN-010` a `SCN-017` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-017` estão verdes.
 
-`SCN-017` é a próxima expansão planejada. Seus artefatos e a tradução de `InvalidOperation` em `unit_price` ainda não estão materializados, implementados ou verdes.
+Não há teste planejado ainda não implementado no harness atualmente materializado.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
