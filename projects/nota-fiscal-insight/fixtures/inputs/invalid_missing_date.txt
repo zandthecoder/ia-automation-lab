@@ -1,0 +1,3 @@
+MERCHANT: Mercado Exemplo
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
