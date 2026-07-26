@@ -289,6 +289,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-015` | `fixtures/inputs/invalid_receipt_total_format.txt` | `SCN-015`     | Total da nota usando vírgula como separador decimal. |          no |
 | `FX-016` | `fixtures/inputs/invalid_line_total_format.txt` | `SCN-016`        | `line_total` com conteúdo não convertível.      |              no |
 | `FX-017` | `fixtures/inputs/non_convertible_unit_price.txt` | `SCN-017`       | `unit_price` superficialmente válido, mas não convertível. |     no |
+| `FX-018` | `fixtures/inputs/invalid_missing_total.txt` | `SCN-018`              | Nota sem o registro obrigatório `TOTAL`.        |              no |
 
 ## Fixture Contents
 
@@ -534,6 +535,22 @@ TOTAL: 10.00
 
 O arquivo `fixtures/inputs/non_convertible_unit_price.txt` foi materializado e revisado.
 
+### FX-018 — Receipt without TOTAL
+
+**Status:** planned, not materialized
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-18
+ITEM: Arroz | 1 | 10.00 | 10.00
+```
+
+`FX-018` terá exatamente três linhas e terminará após o registro `ITEM`, sem linha `TOTAL:`. `MERCHANT` e `DATE` estão presentes e na ordem correta, existe exatamente um `ITEM` com quatro campos, `description == "Arroz"`, `quantity == "1"`, `unit_price == "10.00"` e `line_total == "10.00"`. Quantidade, preço e total do item são positivos, convertíveis e matematicamente consistentes: `1 × 10.00 = 10.00`.
+
+A fixture não contém valor zero ou negativo, conteúdo não convertível, separador decimal alternativo, linha desconhecida, registro duplicado, `TOTAL` duplicado nem registro posterior a `TOTAL`. Ela isola somente a ausência completa do registro obrigatório `TOTAL`; não representa total presente com formato inválido, total divergente da soma dos itens ou registro presente fora de ordem. O arquivo ainda não foi criado.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -670,6 +687,7 @@ O arquivo `fixtures/inputs/non_convertible_unit_price.txt` foi materializado e r
 | N/A                  | `SCN-015`            | `ERR-017`, `invalid_receipt_total` | `FX-015` | N/A            | `TEST-015`             |
 | N/A                  | `SCN-016`            | `ERR-013`, `invalid_line_total` | `FX-016` | N/A               | `TEST-016`             |
 | N/A                  | `SCN-017`            | `ERR-012`, `invalid_unit_price` | `FX-017` | N/A               | `TEST-017`             |
+| `AC-008`             | `SCN-018`            | `ERR-015`, `missing_total` | `FX-018` | N/A                  | `TEST-018`             |
 
 ## Scenario Expansion
 
@@ -1019,6 +1037,47 @@ Os cenários permanecem independentes e não exigem mensagens idênticas.
 Em `SCN-017`, não existe `Decimal` válido para `unit_price`, portanto o parser não pode executar `quantity × unit_price == line_total`. O resultado esperado é `invalid_unit_price`, não `line_total_mismatch`.
 
 O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-017`. `TEST-017` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+### SCN-018 — Receipt without TOTAL
+
+**Status:** planned, not yet implemented
+
+**Given**
+
+* a nota possui exatamente um `MERCHANT`, um `DATE` e um `ITEM`, nessa ordem;
+* o item contém os quatro campos obrigatórios;
+* a descrição do item é válida;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* a quantidade e os valores monetários do item são válidos, positivos e convertíveis;
+* `quantity × unit_price == line_total`;
+* nenhum registro `TOTAL` está presente;
+* não existem linhas desconhecidas nem registros duplicados;
+* o único defeito intencional é a ausência de `TOTAL`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "missing_total"`;
+* `error.message` é uma string não vazia e legível;
+* `invalid_record_order` não é emitido;
+* `receipt_total_mismatch` não é emitido;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado ou parcial é retornado.
+
+O cenário formaliza `ERR-015`, contribui para `AC-008` e protege a exigência de exatamente um registro `TOTAL` definida por `BR-001`. O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-018`; `TEST-018` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+#### Distinção entre erros relacionados a TOTAL
+
+* `invalid_record_order`: registros válidos estão presentes, mas fora da ordem obrigatória, como `DATE` antes de `MERCHANT`;
+* `missing_total`: um prefixo estruturalmente válido termina após `ITEM`, sem qualquer registro `TOTAL`;
+* `invalid_receipt_total`: `TOTAL` está presente, mas seu valor não possui formato aceito, como `"10,00"`;
+* `receipt_total_mismatch`: `TOTAL` está presente e é convertível, mas diverge da soma dos `line_total`.
 
 ## Test Cases
 
@@ -1385,6 +1444,36 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 * nenhum resultado parcial é retornado;
 * nenhum requisito específico é imposto a `line_number`.
 
+### TEST-018 — Reject receipt without TOTAL
+
+**Status:** planned, not yet implemented
+
+**Covers:** `SCN-018`, `ERR-015`, `AC-008`, `missing_total`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-018`
+
+**Expected error:** `missing_total`
+
+**Execution:**
+
+1. Carregar `invalid_missing_total.txt` como texto UTF-8.
+2. Chamar somente `parse_receipt(raw_text)`.
+3. Exigir e capturar `ReceiptValidationError`.
+
+**Pass condition:**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "missing_total"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* a ausência de `TOTAL` não é classificada como `invalid_record_order`;
+* nenhuma conversão nem comparação do total agregado é tentada;
+* o parser não retorna normalmente;
+* nenhum resultado parcial é retornado;
+* nenhum requisito específico é imposto a `line_number`.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -1406,6 +1495,8 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 O caso não convertível de `invalid_line_total` foi promovido para o cenário formal `SCN-016` / `FX-016` / `TEST-016`, que está materializado, implementado e verde. O mesmo código possui dois cenários independentes: `SCN-014` comprova o valor negativo, enquanto `SCN-016` comprova a falha de conversão. O contrato comprovado de `SCN-014` permanece inalterado.
 
 O caso não convertível de `invalid_unit_price` foi promovido para o cenário formal `SCN-017` / `FX-017` / `TEST-017`, que está materializado, implementado e verde. `SCN-013` continua comprovando separadamente a forma lexical com uma casa decimal, enquanto `SCN-017` comprova a tradução da falha de conversão.
+
+`missing_total` foi promovido da lista genérica futura para o cenário formal planejado `SCN-018` / `FX-018` / `TEST-018`. A fixture e o teste ainda não foram materializados, e o contrato ainda não está implementado nem protegido por teste.
 
 Exemplo de tabela futura:
 
@@ -1626,6 +1717,29 @@ As mensagens não precisam ser idênticas. Em contraste, `ITEM: Arroz | 2 | 8.50
 
 Como `_convert_decimal` lança antes de `_parse_item_record` retornar, nenhum item inválido chega a `parse_receipt`, `items.append(...)` não é executado, o acumulador não é atualizado e o registro `TOTAL` não é processado. Nenhum rollback manual é necessário.
 
+### Precedência planejada para SCN-018
+
+Para o incremento de `SCN-018`, a precedência estrutural planejada é:
+
+```text
+empty_input
+→ validar a ordem dos registros presentes
+→ validar os registros ITEM presentes
+→ missing_item
+→ missing_total
+→ converter receipt_total
+→ invalid_receipt_total
+→ receipt_total_mismatch
+```
+
+Essa sequência permite que um prefixo válido contendo `MERCHANT`, `DATE` e ao menos um `ITEM` válido seja classificado como `missing_total` quando o registro final estiver completamente ausente. Ela não redefine a precedência geral de erros concorrentes além do caso isolado por `FX-018`.
+
+Para `FX-018`, a entrada não está vazia, `MERCHANT` e `DATE` estão nas posições corretas, o `ITEM` é processado com sucesso e o fim da entrada é alcançado sem que um `TOTAL` tenha sido encontrado. Nesse ponto, `missing_total` deve ser emitido antes de qualquer conversão ou comparação agregada.
+
+O Red provável é o comportamento atual emitir `invalid_record_order` com `line_number == 3`, porque o último `ITEM` é interpretado como a posição em que `TOTAL` era esperado. Esse resultado demonstrará a ausência do contrato específico `missing_total`; não será aceito como Green de `TEST-018`.
+
+A positividade de `quantity` e de `unit_price` é um contrato explícito ainda sem teste. Valores zero ou negativos podem introduzir erros concorrentes em `line_total` e `receipt_total`, portanto esses cenários permanecem adiados até uma decisão própria de precedência. `SCN-018` foi priorizado por isolar uma única falha estrutural e não elimina nem redefine os contratos numéricos.
+
 Exemplos que ainda exigem essa definição:
 
 * `duplicate_total` versus `invalid_record_order`;
@@ -1694,6 +1808,10 @@ Implemented error contract:
 * `invalid_unit_price`
 * `invalid_line_total`
 * `invalid_receipt_total`
+
+Specified but not yet implemented/protected:
+
+* `missing_total`
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
@@ -1992,6 +2110,21 @@ Esta sequência foi concluída. `TEST-016` foi inicialmente observado vermelho p
 10. Registrar as evidências.
 
 Esta sequência foi concluída. `TEST-017` foi inicialmente observado vermelho porque `InvalidOperation` escapava da conversão direta de `unit_price`. O Green foi obtido ao usar `_convert_decimal` somente nessa conversão, preservando a guarda lexical, e `TEST-001` a `TEST-017` passam juntos.
+
+## Planned TDD Sequence for SCN-018
+
+1. Formalizar `SCN-018` no harness.
+2. Criar `FX-018` sem linha `TOTAL`.
+3. Criar `TEST-018` exigindo `missing_total`.
+4. Executar `TEST-018` e registrar o código público atual.
+5. Confirmar o Red de classificação estrutural.
+6. Implementar a detecção mínima de `TOTAL` ausente.
+7. Preservar `invalid_record_order` para sequências realmente inválidas.
+8. Executar `TEST-018` e os testes estruturais anteriores.
+9. Executar a suíte completa.
+10. Registrar as evidências no harness.
+
+Esta sequência está planejada e ainda não foi iniciada. `FX-018` e `TEST-018` não existem, e `missing_total` ainda não está protegido por teste.
 
 ## TDD Workflow
 
@@ -2314,6 +2447,11 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `SCN-013` continua comprovando separadamente a forma lexical incorreta com uma casa decimal.
 * `_convert_decimal` não foi modificado, nenhum helper adicional foi criado e nenhuma refatoração adicional ocorreu.
 * `TEST-001` a `TEST-017` passam juntos.
+* `SCN-018` foi especificado para um prefixo válido `MERCHANT → DATE → ITEM` que termina sem `TOTAL`.
+* `FX-018` está planejada em `fixtures/inputs/invalid_missing_total.txt`, mas ainda não foi materializada.
+* `TEST-018` está planejado para exigir `ReceiptValidationError` com `error.code == "missing_total"` e mensagem não vazia, sem requisito de `line_number`.
+* O Red provável é `invalid_record_order` com `line_number == 3`, refletindo a interpretação atual do último `ITEM` como a posição esperada de `TOTAL`.
+* `missing_total` está definido na SPEC, mas ainda não está implementado nem protegido por teste.
 
 Implemented and green:
 
@@ -2337,7 +2475,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-018` / `SCN-018`
 
 ### Resumo dos artefatos cobertos
 
@@ -2368,9 +2506,9 @@ Structured-error scenarios:
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-017` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-017` estão verdes.
+`SCN-010` a `SCN-018` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas até aqui, `TEST-001` a `TEST-017` estão verdes.
 
-Não há teste planejado ainda não implementado no harness atualmente materializado.
+`TEST-018` / `SCN-018` é o próximo incremento planejado e ainda não foi materializado nem implementado.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
