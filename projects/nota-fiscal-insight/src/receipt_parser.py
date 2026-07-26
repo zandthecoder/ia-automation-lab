@@ -70,7 +70,11 @@ def _parse_item_record(
             message="Unit price must have exactly two decimal places.",
         )
 
-    decimal_unit_price = Decimal(unit_price)
+    decimal_unit_price = _convert_decimal(
+        unit_price,
+        error_code="invalid_unit_price",
+        error_message="Unit price has an invalid numeric format.",
+    )
 
     decimal_line_total = _convert_decimal(
         line_total,
