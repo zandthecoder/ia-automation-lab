@@ -14,6 +14,21 @@ class ReceiptValidationError(Exception):
         super().__init__(message)
 
 
+def _convert_decimal(
+    value: str,
+    *,
+    error_code: str,
+    error_message: str,
+) -> Decimal:
+    try:
+        return Decimal(value)
+    except InvalidOperation as exc:
+        raise ReceiptValidationError(
+            code=error_code,
+            message=error_message,
+        ) from exc
+
+
 def _parse_item_record(
     line_text: str,
     line_number: int,
@@ -37,13 +52,11 @@ def _parse_item_record(
             message="Item description cannot be empty.",
         )
 
-    try:
-        decimal_quantity = Decimal(quantity)
-    except InvalidOperation as exc:
-        raise ReceiptValidationError(
-            code="invalid_quantity",
-            message="Quantity has an invalid or unsupported numeric format.",
-        ) from exc
+    decimal_quantity = _convert_decimal(
+        quantity,
+        error_code="invalid_quantity",
+        error_message="Quantity has an invalid or unsupported numeric format.",
+    )
 
     whole_unit_price, separator, fractional_unit_price = unit_price.partition(".")
 
@@ -59,13 +72,11 @@ def _parse_item_record(
 
     decimal_unit_price = Decimal(unit_price)
 
-    try:
-        decimal_line_total = Decimal(line_total)
-    except InvalidOperation as exc:
-        raise ReceiptValidationError(
-            code="invalid_line_total",
-            message="Line total has an invalid numeric format.",
-        ) from exc
+    decimal_line_total = _convert_decimal(
+        line_total,
+        error_code="invalid_line_total",
+        error_message="Line total has an invalid numeric format.",
+    )
 
     if decimal_line_total < 0:
         raise ReceiptValidationError(
@@ -171,13 +182,11 @@ def parse_receipt(raw_text: str) -> dict:
 
     receipt_total = total_line.removeprefix("TOTAL:").strip()
 
-    try:
-        decimal_receipt_total = Decimal(receipt_total)
-    except InvalidOperation as exc:
-        raise ReceiptValidationError(
-            code="invalid_receipt_total",
-            message="Receipt total has an invalid numeric format.",
-        ) from exc
+    decimal_receipt_total = _convert_decimal(
+        receipt_total,
+        error_code="invalid_receipt_total",
+        error_message="Receipt total has an invalid numeric format.",
+    )
 
     if calculated_receipt_total != decimal_receipt_total:
         raise ReceiptValidationError(
