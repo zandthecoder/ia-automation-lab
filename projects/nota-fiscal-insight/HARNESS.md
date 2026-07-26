@@ -290,6 +290,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-016` | `fixtures/inputs/invalid_line_total_format.txt` | `SCN-016`        | `line_total` com conteúdo não convertível.      |              no |
 | `FX-017` | `fixtures/inputs/non_convertible_unit_price.txt` | `SCN-017`       | `unit_price` superficialmente válido, mas não convertível. |     no |
 | `FX-018` | `fixtures/inputs/invalid_missing_total.txt` | `SCN-018`              | Nota sem o registro obrigatório `TOTAL`.        |              no |
+| `FX-019` | `fixtures/inputs/invalid_duplicate_total.txt` | `SCN-019`            | Nota válida com segunda ocorrência reconhecida de `TOTAL`. |              no |
 
 ## Fixture Contents
 
@@ -551,6 +552,37 @@ ITEM: Arroz | 1 | 10.00 | 10.00
 
 A fixture não contém valor zero ou negativo, conteúdo não convertível, separador decimal alternativo, linha desconhecida, registro duplicado, `TOTAL` duplicado nem registro posterior a `TOTAL`. Ela isola somente a ausência completa do registro obrigatório `TOTAL`; não representa total presente com formato inválido, total divergente da soma dos itens ou registro presente fora de ordem. O arquivo `fixtures/inputs/invalid_missing_total.txt` foi materializado e revisado.
 
+### FX-019 — Receipt with duplicate TOTAL
+
+**Status:** planned, not materialized
+
+**Planned file:** `fixtures/inputs/invalid_duplicate_total.txt`
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-19
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+TOTAL: 10.00
+```
+
+A entrada possui exatamente cinco linhas. O primeiro `TOTAL` está na linha 4, e a segunda ocorrência reconhecida está na linha 5. Essa posição evidencia a duplicidade, mas `SCN-019` não estabelece contrato obrigatório para `line_number`.
+
+`MERCHANT` e `DATE` aparecem exatamente uma vez e na ordem correta. Existe exatamente um `ITEM`, com quatro campos, descrição `"Arroz"`, quantidade `"1"`, preço unitário `"10.00"` e total da linha `"10.00"`. Os valores são positivos e convertíveis, e `1 × 10.00 == 10.00`.
+
+Os dois valores de `TOTAL` são individualmente válidos, idênticos e correspondem ao acumulado `10.00`. Não existe `receipt_total_mismatch`, `invalid_receipt_total`, prefixo desconhecido, linha sem prefixo, registro obrigatório ausente nem duplicidade de `MERCHANT` ou `DATE`. O único defeito intencional é a segunda ocorrência de `TOTAL`.
+
+O segundo `TOTAL` possui prefixo conhecido e conteúdo numericamente válido. Ele não é um registro inesperado nem deve ser reduzido a uma classificação genérica de ordem: representa uma violação da cardinalidade singleton de `TOTAL`.
+
+```text
+segunda ocorrência reconhecida de TOTAL
+→ duplicate_total
+```
+
+`FX-019` ainda não existe no repositório e não deve ser confundida com uma fixture materializada.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -688,6 +720,7 @@ A fixture não contém valor zero ou negativo, conteúdo não convertível, sepa
 | N/A                  | `SCN-016`            | `ERR-013`, `invalid_line_total` | `FX-016` | N/A               | `TEST-016`             |
 | N/A                  | `SCN-017`            | `ERR-012`, `invalid_unit_price` | `FX-017` | N/A               | `TEST-017`             |
 | `AC-008`             | `SCN-018`            | `ERR-015`, `missing_total` | `FX-018` | N/A                  | `TEST-018`             |
+| N/A                  | `SCN-019`            | `ERR-016`, `BR-001`, `duplicate_total` | `FX-019` | N/A          | `TEST-019`             |
 
 ## Scenario Expansion
 
@@ -1078,6 +1111,119 @@ O cenário formaliza `ERR-015`, contribui para `AC-008` e protege a exigência d
 * `missing_total`: um prefixo estruturalmente válido termina após `ITEM`, sem qualquer registro `TOTAL`;
 * `invalid_receipt_total`: `TOTAL` está presente, mas seu valor não possui formato aceito, como `"10,00"`;
 * `receipt_total_mismatch`: `TOTAL` está presente e é convertível, mas diverge da soma dos `line_total`.
+
+### SCN-019 — Receipt with duplicate TOTAL
+
+**Status:** planned, not implemented
+
+**Covers:** `ERR-016`, `BR-001`, `duplicate_total`, Error Contract
+
+**Given**
+
+* a entrada contém exatamente um `MERCHANT` e exatamente uma `DATE`;
+* `MERCHANT` aparece antes de `DATE`;
+* existe exatamente um `ITEM`, depois de `DATE`;
+* o item possui quatro campos;
+* `description == "Arroz"`;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* `quantity × unit_price == line_total`;
+* existe um primeiro registro `TOTAL` com `"10.00"`;
+* existe um segundo registro `TOTAL` com `"10.00"`;
+* ambos os totais são convertíveis, idênticos e correspondem ao valor acumulado;
+* o único defeito intencional é a segunda ocorrência de `TOTAL`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "duplicate_total"`;
+* `error.message` é uma string não vazia e legível;
+* `invalid_record_order` não é emitido;
+* `unexpected_record` não é emitido;
+* `invalid_receipt_total` não é emitido;
+* `receipt_total_mismatch` não é emitido;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é retornado.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-019`. Embora a segunda ocorrência exista fisicamente na linha 5, o futuro `TEST-019` não deverá exigir `error.line_number == 5`, `error.line_number is None` nem qualquer outro valor.
+
+#### Structural distinctions
+
+Ordem inválida pressupõe cardinalidades corretas e uma sequência proibida:
+
+```text
+DATE
+MERCHANT
+ITEM
+TOTAL
+→ invalid_record_order
+```
+
+Em `SCN-019`, a primeira sequência completa já possui um `TOTAL`, e a segunda ocorrência repete um registro singleton reconhecido:
+
+```text
+MERCHANT
+DATE
+ITEM
+TOTAL
+TOTAL
+→ duplicate_total
+```
+
+Por isso, `duplicate_total` prevalece sobre `invalid_record_order` para a ocorrência repetida.
+
+`unexpected_record` corresponde a prefixo desconhecido, conteúdo sem prefixo válido ou linha não classificável:
+
+```text
+COUPON: 5.00
+→ unexpected_record
+```
+
+`TOTAL: 10.00` continua sendo um registro reconhecido quando repetido; portanto, a segunda ocorrência produz `duplicate_total`, não `unexpected_record`.
+
+`invalid_receipt_total` exige conteúdo inválido ou não convertível, como `TOTAL: 10,00`. Em `SCN-019`, ambos os totais usam `"10.00"` e são individualmente válidos.
+
+`receipt_total_mismatch` exige divergência entre um total convertível e a soma dos itens. Em `SCN-019`, `quantity × unit_price == line_total == 10.00`, e os dois totais também contêm `"10.00"`. A falha é estrutural e deve ser classificada antes da comparação matemática.
+
+O parser não deve escolher silenciosamente o primeiro ou o último `TOTAL`, ignorar a segunda ocorrência, retornar normalmente porque os valores são idênticos nem reduzir a validação à comparação matemática.
+
+#### Protected structural precedence
+
+```text
+empty_input
+→ reconhecer os tipos dos registros
+→ verificar registros obrigatórios ausentes
+→ verificar duplicidade de registros singleton
+→ duplicate_total
+→ verificar ordem dos registros com cardinalidade válida
+→ invalid_record_order
+→ validar conteúdo do TOTAL
+→ invalid_receipt_total
+→ receipt_total_mismatch
+```
+
+Para `FX-019`, a entrada não está vazia, todos os tipos são reconhecidos, nenhum registro obrigatório está ausente e `TOTAL` aparece duas vezes. A duplicidade deve ser identificada antes da classificação genérica de ordem e antes das validações numéricas e matemáticas do total.
+
+Essa sequência descreve o contrato público e não exige uma implementação em múltiplas passagens.
+
+`SCN-019` define somente um defeito estrutural principal isolado. Ele não estabelece precedência para combinações com `MERCHANT` ou `DATE` ausente, prefixo desconhecido, `TOTAL` não convertível, totais divergentes, item inválido ou outra duplicidade estrutural.
+
+#### Relationship with SCN-018
+
+```text
+SCN-018: zero ocorrências de TOTAL
+→ missing_total
+
+SCN-019: duas ocorrências de TOTAL
+→ duplicate_total
+```
+
+Os dois cenários protegem cardinalidades diferentes do mesmo registro singleton e não devem ser combinados nem parametrizados.
 
 ## Test Cases
 
@@ -1474,6 +1620,50 @@ O cenário formaliza `ERR-015`, contribui para `AC-008` e protege a exigência d
 * nenhum resultado parcial é retornado;
 * nenhum requisito específico é imposto a `line_number`.
 
+### TEST-019 — Reject receipt with duplicate TOTAL
+
+**Status:** planned, not implemented
+
+**Covers:** `SCN-019`, `ERR-016`, `BR-001`, `duplicate_total`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-019`
+
+**Expected error:** `duplicate_total`
+
+**Execution:**
+
+1. Carregar `invalid_duplicate_total.txt` como texto UTF-8.
+2. Chamar somente `parse_receipt(raw_text)`.
+3. Exigir e capturar `ReceiptValidationError`.
+
+**Pass condition:**
+
+* `error.code == "duplicate_total"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* `invalid_record_order` não é aceito;
+* `unexpected_record` não é aceito;
+* o parser não retorna normalmente;
+* nenhum total é escolhido silenciosamente;
+* nenhuma ocorrência duplicada é ignorada;
+* nenhum resultado estruturado é retornado;
+* nenhum requisito específico é imposto a `line_number`.
+
+O teste deve aceitar somente `duplicate_total`, sem uma lista de códigos alternativos. Caso a exceção reporte um `line_number`, o valor deverá ser registrado como observação, não como condição de aprovação.
+
+**Expected Red with the current implementation:**
+
+```text
+ReceiptValidationError
+code: invalid_record_order
+message: Record is out of order; expected ITEM on line 4.
+line_number: 4
+```
+
+O futuro `TEST-019` deverá ficar vermelho ao comparar o código esperado `duplicate_total` com o código atual `invalid_record_order`. Esse Red demonstra que a entrada já é rejeitada, mas a duplicidade ainda é identificada indiretamente como ordem inválida, sem contagem ou classificação explícita das ocorrências de `TOTAL`.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -1497,6 +1687,8 @@ O caso não convertível de `invalid_line_total` foi promovido para o cenário f
 O caso não convertível de `invalid_unit_price` foi promovido para o cenário formal `SCN-017` / `FX-017` / `TEST-017`, que está materializado, implementado e verde. `SCN-013` continua comprovando separadamente a forma lexical com uma casa decimal, enquanto `SCN-017` comprova a tradução da falha de conversão.
 
 `missing_total` foi promovido da lista genérica futura para o cenário formal `SCN-018` / `FX-018` / `TEST-018`, que está materializado, implementado e verde.
+
+`duplicate_total` foi promovido para o cenário planejado `SCN-019` / `FX-019` / `TEST-019`. A fixture ainda não foi materializada, o teste ainda não foi criado e o contrato ainda não está protegido pelo harness executável.
 
 Exemplo de tabela futura:
 
@@ -1819,6 +2011,12 @@ Implemented error contract:
 * `invalid_line_total`
 * `invalid_receipt_total`
 
+Specified but not yet implemented or protected:
+
+* `duplicate_total`
+
+`missing_merchant`, `missing_date`, `duplicate_merchant`, `duplicate_date`, `unexpected_record` e os demais contratos sem cenário executável também não devem ser interpretados como implementados. `SCN-019` planeja somente `duplicate_total`.
+
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
 O contrato `empty_input` está comprovado por `SCN-010` usando uma string completamente vazia. Essa evidência não declara suporte formal para entradas contendo somente whitespace e não implementa outros códigos de registros ausentes.
@@ -2130,6 +2328,22 @@ Esta sequência foi concluída. `TEST-017` foi inicialmente observado vermelho p
 10. Registrar as evidências no harness.
 
 Esta sequência foi concluída. `FX-018` e `TEST-018` foram materializados, o Red expôs `invalid_record_order`, e o Green foi obtido ao distinguir o fim da entrada sem `TOTAL`. `TEST-001` a `TEST-018` passam juntos.
+
+## TDD Sequence for SCN-019
+
+1. Formalizar `SCN-019` no harness.
+2. Criar `FX-019` com dois registros `TOTAL` idênticos.
+3. Criar `TEST-019` exigindo `duplicate_total`.
+4. Executar `TEST-019` e registrar o código público atual.
+5. Confirmar o Red de `invalid_record_order`.
+6. Implementar a contagem ou detecção mínima de `TOTAL` duplicado.
+7. Preservar `missing_total` para zero ocorrências.
+8. Preservar `invalid_record_order` para cardinalidade válida em sequência proibida.
+9. Executar `TEST-019` e os testes estruturais anteriores.
+10. Executar a suíte completa.
+11. Registrar as evidências no harness.
+
+Somente a primeira etapa foi concluída nesta tarefa documental. `FX-019`, `TEST-019` e o comportamento `duplicate_total` ainda não foram materializados ou implementados.
 
 ## TDD Workflow
 
@@ -2460,6 +2674,11 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * A interface pública agora lança `ReceiptValidationError` com `error.code == "missing_total"` e mensagem não vazia; nenhum requisito específico para `line_number` foi criado.
 * Para `SCN-018`, `_convert_decimal` não é chamada para `receipt_total`, nenhuma comparação agregada ocorre e nenhum resultado estruturado é retornado.
 * `TEST-001` a `TEST-018` passam juntos.
+* `SCN-019` foi formalizado como uma nova expansão estrutural planejada para `duplicate_total`.
+* `FX-019` ainda não foi materializada, e `TEST-019` ainda não foi criado.
+* `duplicate_total` está especificado, mas ainda não foi comprovado pelo harness executável.
+* O comportamento atual observado para dois registros `TOTAL` é `invalid_record_order`, com a mensagem indicando `ITEM` esperado na linha 4.
+* `TEST-001` a `TEST-018` continuam verdes; nenhuma evidência de implementação foi atribuída a `SCN-019`.
 
 Implemented and green:
 
@@ -2484,7 +2703,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-019` / `SCN-019`
 
 ### Resumo dos artefatos cobertos
 
@@ -2518,11 +2737,11 @@ Os nove cenários definidos no harness inicial estão materializados e possuem t
 
 `SCN-010` a `SCN-018` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-018` estão verdes.
 
-Não existem testes pendentes no harness atualmente materializado.
+Não existem testes pendentes entre os artefatos atualmente materializados. `TEST-019` está planejado, mas `FX-019` e o próprio teste ainda não existem no repositório.
 
 ### Lacunas ainda abertas
 
-Ainda não foram materializados cenários para `missing_merchant`, `missing_date`, `duplicate_total`, `unexpected_record`, `TOTAL` antecipado, registro depois de `TOTAL`, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e outras regras numéricas previstas pela SPEC sem teste. Nenhum desses contratos é declarado como implementado por `SCN-018`.
+Ainda não foram materializados cenários para `missing_merchant`, `missing_date`, `duplicate_total`, `unexpected_record`, `TOTAL` antecipado, registro depois de `TOTAL`, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e outras regras numéricas previstas pela SPEC sem teste. `duplicate_total` agora possui o planejamento documental de `SCN-019`, mas ainda não possui fixture ou teste. Nenhum desses contratos é declarado como implementado por `SCN-018`.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
