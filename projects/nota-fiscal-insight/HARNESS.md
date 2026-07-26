@@ -286,6 +286,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-012` | `fixtures/inputs/invalid_item_description.txt`  | `SCN-012`        | Linha `ITEM` com descrição vazia e quatro campos. |            no |
 | `FX-013` | `fixtures/inputs/invalid_unit_price.txt`        | `SCN-013`        | Preço unitário com somente uma casa decimal.    |              no |
 | `FX-014` | `fixtures/inputs/negative_line_total.txt`       | `SCN-014`        | Total do item negativo.                         |              no |
+| `FX-015` | `fixtures/inputs/invalid_receipt_total_format.txt` | `SCN-015`     | Total da nota usando vírgula como separador decimal. |          no |
 
 ## Fixture Contents
 
@@ -472,6 +473,27 @@ TOTAL: -1.00
 
 O arquivo `fixtures/inputs/negative_line_total.txt` foi materializado e revisado.
 
+### FX-015 — Receipt total with unsupported decimal separator
+
+**Status:** planned
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-15
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10,00
+```
+
+`FX-015` deverá isolar somente o formato do total agregado. `MERCHANT` e `DATE` estarão presentes, a ordem estrutural será válida e haverá exatamente um registro `ITEM` com quatro campos. `description == "Arroz"`, `quantity == "1"`, `unit_price == "10.00"` e `line_total == "10.00"` serão válidos, com `1 × 10.00 == 10.00`.
+
+O total acumulado dos itens será `10.00`; somente `TOTAL` conterá `"10,00"`. A vírgula não pertence ao formato numérico controlado, e não haverá divergência matemática intencional nem outro erro estrutural ou local do item.
+
+O arquivo planejado será `fixtures/inputs/invalid_receipt_total_format.txt`. Ele não deverá reutilizar nem sobrescrever `fixtures/inputs/invalid_receipt_total.txt`, que permanece associado a `FX-005` / `SCN-005` / `receipt_total_mismatch`.
+
+`FX-015` ainda não foi materializada.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -605,6 +627,7 @@ O arquivo `fixtures/inputs/negative_line_total.txt` foi materializado e revisado
 | N/A                  | `SCN-012`            | `ERR-010`, `invalid_item_description` | `FX-012` | N/A          | `TEST-012`             |
 | N/A                  | `SCN-013`            | `ERR-012`, `invalid_unit_price` | `FX-013` | N/A               | `TEST-013`             |
 | N/A                  | `SCN-014`            | `ERR-013`, `invalid_line_total` | `FX-014` | N/A               | `TEST-014`             |
+| N/A                  | `SCN-015`            | `ERR-017`, `invalid_receipt_total` | `FX-015` | N/A            | `TEST-015`             |
 
 ## Scenario Expansion
 
@@ -783,6 +806,63 @@ Formato textual, valor semântico e consistência matemática permanecem contrat
 * `SCN-004`: `ITEM: Arroz | 2 | 8.50 | 16.00` contém um total positivo e válido isoladamente, mas inconsistente com `2 × 8.50`, e produz `line_total_mismatch`.
 
 Esses contratos não são combinados: formato é validado antes do valor semântico, e a consistência matemática somente é avaliada depois que os valores envolvidos forem individualmente válidos.
+
+### SCN-015 — Receipt total with unsupported decimal separator
+
+**Status:** planned
+
+**Given**
+
+* a nota possui `MERCHANT`, `DATE`, `ITEM` e `TOTAL` na ordem correta;
+* existe exatamente um registro `ITEM` válido;
+* descrição, quantidade, preço unitário e total do item são válidos;
+* o total calculado dos itens é `10.00`;
+* o campo `TOTAL` contém `"10,00"`;
+* o único defeito intencional é o uso da vírgula como separador decimal no total da nota.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_receipt_total"`;
+* `error.message` é uma string não vazia e legível;
+* `decimal.InvalidOperation` não escapa da interface pública;
+* `receipt_total_mismatch` não substitui `invalid_receipt_total`;
+* nenhum resultado parcial é retornado.
+
+`"10,00"` não usa o separador decimal aceito pelo formato controlado. O cenário representa uma falha de formato e conversão no campo agregado `TOTAL`; não representa soma incorreta, total negativo, ausência ou duplicidade de `TOTAL`, ordem estrutural inválida nem erro dentro de `ITEM`.
+
+A falha técnica deverá ser traduzida para o contrato público:
+
+```text
+decimal.InvalidOperation
+→ ReceiptValidationError(code="invalid_receipt_total")
+```
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-015`. `TEST-015` não deverá verificar `error.line_number == 4`, `error.line_number is None` nem qualquer outro valor.
+
+#### Distinção de `receipt_total_mismatch`
+
+`SCN-005` cobre um total válido, convertível e formatado com ponto decimal, mas inconsistente:
+
+```text
+ITEM: Arroz | 2 | 8.50 | 17.00
+ITEM: Café | 1 | 12.00 | 12.00
+TOTAL: 30.00
+```
+
+A soma correta é `29.00`, portanto o resultado é `receipt_total_mismatch`.
+
+`SCN-015` planeja um item que soma corretamente `10.00`, mas usa:
+
+```text
+TOTAL: 10,00
+```
+
+Como o total não pode ser convertido para um valor decimal válido, o resultado esperado é `invalid_receipt_total`, antes de qualquer comparação matemática.
 
 ## Test Cases
 
@@ -1073,6 +1153,30 @@ Esses contratos não são combinados: formato é validado antes do valor semânt
 * nenhum resultado parcial é retornado;
 * nenhum requisito específico é imposto a `line_number`.
 
+### TEST-015 — Reject receipt total with comma decimal separator
+
+**Status:** planned
+
+**Covers:** `SCN-015`, `ERR-017`, `invalid_receipt_total`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-015`
+
+**Expected error:** `invalid_receipt_total`
+
+**Pass condition:**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "invalid_receipt_total"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* `decimal.InvalidOperation` não escapa;
+* o parser não retorna normalmente;
+* `receipt_total_mismatch` não é emitido;
+* nenhum resultado parcial é retornado;
+* nenhum requisito específico é imposto a `line_number`.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -1089,6 +1193,8 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 `invalid_line_total` foi promovido da lista genérica futura para o cenário formal `SCN-014` / `FX-014` / `TEST-014`, que está materializado, implementado e verde.
 
+`invalid_receipt_total` foi promovido da lista genérica futura para o cenário formal planejado `SCN-015` / `FX-015` / `TEST-015`. A fixture e o teste ainda não foram materializados, e o contrato ainda não foi comprovado pelo harness.
+
 Exemplo de tabela futura:
 
 | Error code                 | Synthetic input condition |
@@ -1101,7 +1207,6 @@ Exemplo de tabela futura:
 | `invalid_date`             | `2026-02-30`              |
 | `missing_total`            | ausência de `TOTAL`       |
 | `duplicate_total`          | duas linhas `TOTAL`       |
-| `invalid_receipt_total`    | total `10,00`             |
 | `unexpected_record`        | prefixo desconhecido      |
 
 Esses testes não precisam ser todos implementados no primeiro incremento.
@@ -1202,6 +1307,27 @@ assert "line_total_mismatch" == "invalid_line_total"
 ```
 
 Esse Red demonstrou a ausência da validação semântica e da precedência esperada. Após a guarda localizada, o parser emite `invalid_line_total` com mensagem não vazia. Um item com total negativo não entra em `items`, não altera o acumulador, não gera item retornável e não alcança a validação do total agregado.
+
+### Precedência planejada para SCN-015
+
+O fluxo agregado localizado planejado é:
+
+```text
+itens estruturalmente válidos
+→ itens localmente válidos
+→ existência de pelo menos um item
+→ conversão e validação de TOTAL
+→ invalid_receipt_total
+→ receipt_total_mismatch
+```
+
+Para `SCN-015`, todos os itens serão processados e o total decimal `10.00` será acumulado. Depois da extração de `TOTAL: 10,00`, a falha de conversão deverá ser traduzida para `invalid_receipt_total`; a comparação com o total acumulado não deverá ser executada e nenhum dicionário final será retornado.
+
+`invalid_receipt_total` deve preceder `receipt_total_mismatch`, pois não é possível comparar corretamente um total que ainda não foi convertido para um valor decimal válido. Essa precedência está limitada a `SCN-015` e não estabelece política geral para contratos ainda não materializados, como `missing_total` ou `duplicate_total`.
+
+O Red mais provável é `decimal.InvalidOperation` escapar de `Decimal("10,00")` em vez de o parser lançar `ReceiptValidationError` com `code == "invalid_receipt_total"`. Esse Red demonstrará que a entrada é rejeitada, mas ainda atravessa a fronteira pública com um tipo técnico.
+
+Um `TOTAL` com formato inválido não produz dicionário final nem nota parcial observável e não alcança `receipt_total_mismatch`. Esse contrato não impõe rollback ou limpeza manual como detalhe de implementação.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1516,6 +1642,27 @@ A regra de `line_total` negativo pertence ao processamento local de um item e fo
 
 Esta sequência foi concluída. `TEST-014` foi inicialmente observado vermelho porque recebia `line_total_mismatch`. O Green foi obtido com uma guarda semântica localizada depois da conversão decimal e antes da comparação matemática. `TEST-001` a `TEST-014` passam juntos.
 
+### Fronteira de implementação futura para SCN-015
+
+`invalid_receipt_total` pertence ao processamento agregado da nota. A validação futura deverá permanecer em `parse_receipt` ou em uma função privada específica do total da nota, caso essa fronteira venha a existir; `_parse_item_record` não deverá assumir responsabilidade pelo registro `TOTAL`.
+
+A implementação deverá capturar somente a falha esperada da conversão do total, sem `except Exception`, sem recalcular o total acumulado e sem alterar a assinatura pública de `parse_receipt`.
+
+SCN-013 valida o formato lexical de `unit_price`, SCN-014 valida o valor negativo de `line_total` e SCN-015 validará o formato não convertível de `receipt_total`. As regras são relacionadas, mas possuem falhas e precedências diferentes. Nenhum helper monetário genérico é decidido nesta etapa; uma revisão estrutural poderá ocorrer somente depois do Green de SCN-015 e deverá preservar códigos distintos por campo.
+
+## Planned TDD Sequence for SCN-015
+
+1. Formalizar `SCN-015` no harness.
+2. Criar `FX-015` com `TOTAL` igual a `"10,00"`.
+3. Criar `TEST-015`.
+4. Executar `TEST-015` e observar o Red.
+5. Traduzir a falha de conversão para `invalid_receipt_total`.
+6. Executar `TEST-015` e `TEST-005`.
+7. Executar a suíte completa.
+8. Registrar as evidências.
+
+Somente a primeira etapa está concluída. `FX-015`, `TEST-015` e a implementação de `invalid_receipt_total` ainda não existem.
+
 ## TDD Workflow
 
 Para cada comportamento:
@@ -1798,6 +1945,10 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * O helper lança antes de retornar; o item inválido não é adicionado nem acumulado, e a validação do total agregado não é alcançada.
 * Nenhum helper adicional foi criado e nenhuma refatoração ocorreu.
 * `TEST-001` a `TEST-014` passam juntos.
+* `SCN-015` é uma nova expansão comportamental planejada para `TOTAL: 10,00`.
+* `FX-015` ainda não foi materializada.
+* `TEST-015` ainda não foi criado.
+* `invalid_receipt_total` ainda não foi comprovado pelo harness; `receipt_total_mismatch` permanece comprovado separadamente por `SCN-005`.
 
 Implemented and green:
 
@@ -1818,7 +1969,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-015` / `SCN-015`
 
 ### Resumo dos artefatos cobertos
 
@@ -1846,9 +1997,9 @@ Structured-error scenarios:
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-014` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-014` estão verdes.
+`SCN-010` a `SCN-015` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-014` estão verdes.
 
-Não existem testes pendentes no harness atualmente materializado.
+`SCN-015` é a próxima expansão planejada. Seus artefatos e seu comportamento ainda não estão materializados, implementados ou verdes.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
