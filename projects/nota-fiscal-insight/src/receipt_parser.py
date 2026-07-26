@@ -124,6 +124,18 @@ def parse_receipt(raw_text: str) -> dict:
             message="Receipt input is empty.",
         )
 
+    merchant_records = [
+        (line_number, line_text)
+        for line_number, line_text in normalized_lines
+        if line_text.startswith("MERCHANT:")
+    ]
+
+    if not merchant_records:
+        raise ReceiptValidationError(
+            code="missing_merchant",
+            message="Receipt MERCHANT record is missing.",
+        )
+
     total_records = [
         (line_number, line_text)
         for line_number, line_text in normalized_lines
