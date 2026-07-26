@@ -453,9 +453,9 @@ O arquivo `fixtures/inputs/invalid_unit_price.txt` foi materializado e revisado.
 
 ### FX-014 — ITEM with negative line total
 
-**Status:** planned
+**Status:** materialized
 
-Conteúdo planejado:
+Conteúdo materializado:
 
 ```text
 MERCHANT: Mercado Exemplo
@@ -464,13 +464,13 @@ ITEM: Arroz | 2 | 8.50 | -1.00
 TOTAL: -1.00
 ```
 
-`FX-014` deverá isolar a regra semântica de `line_total` negativo. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, existe exatamente um registro `ITEM`, a linha possui quatro campos, a descrição é `"Arroz"`, a quantidade `"2"` é válida e `unit_price == "8.50"` possui formato válido.
+`FX-014` isola a regra semântica de `line_total` negativo. `MERCHANT` e `DATE` estão presentes, a ordem estrutural é válida, existe exatamente um registro `ITEM`, a linha possui quatro campos, a descrição é `"Arroz"`, a quantidade `"2"` é válida e `unit_price == "8.50"` possui formato válido.
 
 `Decimal("-1.00")` é convertível e `"-1.00"` possui duas casas decimais, mas o valor é negativo e viola a regra de domínio. A divergência matemática `2 × 8.50 == 17.00` e `17.00 != -1.00` é inevitável e serve para comprovar que `invalid_line_total` deve preceder `line_total_mismatch`.
 
-`TOTAL: -1.00` foi escolhido para manter consistência entre o `line_total` declarado e o total declarado da nota. O parser deverá falhar durante o processamento do item, antes da validação agregada; `SCN-014` não formaliza `invalid_receipt_total`.
+`TOTAL: -1.00` foi escolhido para manter consistência entre o `line_total` declarado e o total declarado da nota. O parser falha durante o processamento do item, antes da validação agregada; `SCN-014` não formaliza `invalid_receipt_total`.
 
-O arquivo `fixtures/inputs/negative_line_total.txt` ainda não existe e não deve ser materializado antes da tarefa específica de fixture.
+O arquivo `fixtures/inputs/negative_line_total.txt` foi materializado e revisado.
 
 ## Expected Output Manifest
 
@@ -730,7 +730,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### SCN-014 — ITEM with negative line total
 
-**Status:** planned
+**Status:** implemented and green
 
 **Given**
 
@@ -772,7 +772,17 @@ ITEM: Arroz | 2 | 8.50 | -1.00
 
 No primeiro caso, o valor é positivo, convertível, possui duas casas e diverge de `2 × 8.50`. No segundo, o valor é convertível e possui duas casas, mas é negativo; por isso, `invalid_line_total` deve ser emitido antes da comparação matemática.
 
-O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-014`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-014` não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-014`. O atributo permanece na interface pública de `ReceiptValidationError`, mas `TEST-014` não verifica `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+#### Distinção entre formato, valor semântico e consistência matemática
+
+Formato textual, valor semântico e consistência matemática permanecem contratos separados:
+
+* `SCN-013`: `unit_price == "8.5"` é convertível, mas não possui a representação monetária exigida e produz `invalid_unit_price`;
+* `SCN-014`: `line_total == "-1.00"` é convertível e possui duas casas decimais, mas é semanticamente inválido por ser negativo e produz `invalid_line_total`;
+* `SCN-004`: `ITEM: Arroz | 2 | 8.50 | 16.00` contém um total positivo e válido isoladamente, mas inconsistente com `2 × 8.50`, e produz `line_total_mismatch`.
+
+Esses contratos não são combinados: formato é validado antes do valor semântico, e a consistência matemática somente é avaliada depois que os valores envolvidos forem individualmente válidos.
 
 ## Test Cases
 
@@ -1040,7 +1050,7 @@ O texto exato da mensagem e o valor de `line_number` não fazem parte do contrat
 
 ### TEST-014 — Reject negative line total
 
-**Status:** planned
+**Status:** implemented and green
 
 **Covers:** `SCN-014`, `ERR-013`, `invalid_line_total`, Error Contract
 
@@ -1077,7 +1087,7 @@ Para `AC-008`, deve existir cobertura planejada para a ausência de cada registr
 
 `invalid_unit_price` foi promovido da lista genérica futura para o cenário formal `SCN-013` / `FX-013` / `TEST-013`, que está implementado e verde.
 
-`invalid_line_total` foi promovido da lista genérica futura para o cenário formal planejado `SCN-014` / `FX-014` / `TEST-014`. A fixture e o teste ainda não foram materializados, e o contrato ainda não foi comprovado pelo harness.
+`invalid_line_total` foi promovido da lista genérica futura para o cenário formal `SCN-014` / `FX-014` / `TEST-014`, que está materializado, implementado e verde.
 
 Exemplo de tabela futura:
 
@@ -1168,9 +1178,9 @@ Failed: DID NOT RAISE ReceiptValidationError
 
 Esse Red demonstrou a ausência de validação lexical do preço unitário, não uma falha de conversão decimal.
 
-### Precedência planejada para SCN-014
+### Comportamento comprovado para SCN-014
 
-Para as regras atualmente cobertas de `ITEM`, a ordem localizada planejada passa a ser:
+Para as regras atualmente cobertas de `ITEM`, a ordem localizada comprovada é:
 
 ```text
 invalid_item_format
@@ -1181,17 +1191,17 @@ invalid_item_format
 → line_total_mismatch
 ```
 
-Em `SCN-014`, a quantidade de campos, a descrição, a quantidade e o formato de `unit_price` já são válidos. `unit_price` é convertido, `line_total` é convertido e seu valor deve ser validado como não negativo antes da comparação matemática. Somente um item totalmente válido poderá ser retornado.
+Em `SCN-014`, a quantidade de campos, a descrição, a quantidade e o formato de `unit_price` já são válidos. `unit_price` é convertido, `line_total` é convertido e seu valor negativo é rejeitado antes da comparação matemática. Somente um item totalmente válido é retornado.
 
-A validação negativa depende do `Decimal` já convertido, que deverá ser reutilizado sem uma segunda conversão. Essa precedência está limitada ao `line_total == "-1.00"` coberto por `SCN-014` e não estabelece política geral para outros campos negativos.
+A validação negativa reutiliza o `Decimal` já convertido, sem uma segunda conversão. Essa precedência está limitada ao `line_total == "-1.00"` coberto por `SCN-014` e não estabelece política geral para outros campos negativos.
 
-O Red mais provável é `TEST-014` receber `ReceiptValidationError` com o código já existente `line_total_mismatch`, produzindo uma divergência equivalente a:
+O Red observado foi `TEST-014` receber `ReceiptValidationError` com o código `line_total_mismatch`, produzindo a divergência:
 
 ```text
 assert "line_total_mismatch" == "invalid_line_total"
 ```
 
-Esse Red demonstrará a ausência da validação semântica e da precedência esperada. Um item com total negativo não entra em `items`, não altera o acumulador, não gera item retornável e não alcança a validação do total agregado.
+Esse Red demonstrou a ausência da validação semântica e da precedência esperada. Após a guarda localizada, o parser emite `invalid_line_total` com mensagem não vazia. Um item com total negativo não entra em `items`, não altera o acumulador, não gera item retornável e não alcança a validação do total agregado.
 
 Exemplos que ainda exigem essa definição:
 
@@ -1259,6 +1269,7 @@ Implemented error contract:
 * `invalid_item_format`
 * `invalid_item_description`
 * `invalid_unit_price`
+* `invalid_line_total`
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
@@ -1270,6 +1281,8 @@ O contrato `invalid_item_description` está comprovado somente pela descrição 
 
 O contrato `invalid_unit_price` está comprovado somente por `unit_price == "8.5"` em `SCN-013`. Essa evidência não formaliza preço vazio, negativo, zero, com três casas, com vírgula ou em notação científica, nem outros formatos monetários ainda não materializados.
 
+O contrato `invalid_line_total` está comprovado somente por `line_total == "-1.00"` em `SCN-014`. Essa evidência não formaliza `line_total == "0.00"`, formato lexical inválido ou campo vazio de `line_total`, quantidade negativa, preço unitário negativo, `invalid_receipt_total` ou `TOTAL` negativo isoladamente.
+
 Fluxo atualmente comprovado pelos testes:
 
 1. enumerar as linhas brutas preservando seus números originais;
@@ -1277,24 +1290,27 @@ Fluxo atualmente comprovado pelos testes:
 3. ignorar linhas vazias;
 4. detectar entrada vazia;
 5. validar a sequência estrutural;
-6. enviar registros `ITEM` para `_parse_item_record`;
+6. enviar cada registro `ITEM` para `_parse_item_record`;
 7. dividir e normalizar os campos;
 8. validar exatamente quatro campos;
 9. validar a descrição;
 10. converter e validar a quantidade;
 11. validar o formato lexical de `unit_price`;
 12. converter `unit_price` para `Decimal`;
-13. converter `line_total`;
-14. validar o total matemático do item;
-15. retornar o item e seu total decimal;
-16. adicionar e acumular somente após retorno bem-sucedido;
-17. verificar a existência de itens;
-18. validar o total agregado;
-19. produzir a saída estruturada.
+13. converter `line_total` para `Decimal`;
+14. rejeitar `line_total` negativo;
+15. validar `quantity × unit_price == line_total`;
+16. construir e retornar o item e seu total decimal;
+17. adicionar e acumular somente após retorno bem-sucedido;
+18. verificar a existência de itens;
+19. validar o total agregado;
+20. produzir a saída estruturada.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
 
 Esse fluxo descreve o comportamento coberto pelos testes atuais, não uma arquitetura definitiva.
+
+O desenho atual evita rollback: `_parse_item_record` valida completamente o registro e lança antes de retornar quando o item é inválido. `parse_receipt` somente adiciona o item e atualiza o acumulador depois do retorno bem-sucedido; portanto, itens inválidos não deixam estado parcial observável.
 
 Em `FX-008`, os registros correspondem a:
 
@@ -1483,11 +1499,11 @@ Esta sequência foi concluída. O Red demonstrou que o parser aceitava `"8.5"` p
 
 ### Relação de SCN-014 com `_parse_item_record`
 
-A regra de `line_total` negativo pertence ao processamento local de um item e sua implementação futura deverá ocorrer em `_parse_item_record`, não em `parse_receipt`. A assinatura atual do helper não deverá precisar mudar, e o `Decimal` de `line_total` já convertido deverá ser reutilizado.
+A regra de `line_total` negativo pertence ao processamento local de um item e foi implementada em `_parse_item_record`, não em `parse_receipt`. A assinatura do helper permaneceu inalterada, e o `Decimal` de `line_total` já convertido é reutilizado.
 
-`SCN-014` não demonstra repetição da regra lexical de duas casas de `SCN-013`: um cenário valida o formato lexical de `unit_price`, enquanto o outro valida semanticamente o valor negativo de `line_total`. Portanto, este cenário isolado não justifica `_validate_money`, `_parse_money` nem outro helper monetário genérico.
+`SCN-014` não demonstra repetição da regra lexical de duas casas de `SCN-013`: um cenário valida o formato lexical de `unit_price`, enquanto o outro valida semanticamente o valor negativo de `line_total`. A mudança foi uma guarda localizada; nenhum helper monetário genérico foi criado e nenhuma refatoração ocorreu.
 
-## Planned TDD Sequence for SCN-014
+## TDD Sequence for SCN-014
 
 1. Formalizar `SCN-014` no harness.
 2. Criar `FX-014` com `line_total` igual a `"-1.00"`.
@@ -1498,7 +1514,7 @@ A regra de `line_total` negativo pertence ao processamento local de um item e su
 7. Executar a suíte completa.
 8. Registrar as evidências.
 
-Nenhuma etapa desta sequência é registrada como concluída nesta tarefa. Nenhuma fixture, teste ou implementação de `invalid_line_total` existe ainda.
+Esta sequência foi concluída. `TEST-014` foi inicialmente observado vermelho porque recebia `line_total_mismatch`. O Green foi obtido com uma guarda semântica localizada depois da conversão decimal e antes da comparação matemática. `TEST-001` a `TEST-014` passam juntos.
 
 ## TDD Workflow
 
@@ -1679,6 +1695,7 @@ Mesmo com todos os testes passando:
 | `2026-07-24` | `8a9eb8d`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-011 passed; malformed ITEM records now raise invalid_item_format before unpacking or numeric conversion.` |
 | `2026-07-25` | `748f1db`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-012 passed; empty ITEM descriptions now raise invalid_item_description before numeric conversion.` |
 | `2026-07-25` | `52a15c3`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-013 passed; unit_price 8.5 now raises invalid_unit_price before mathematical validation.` |
+| `2026-07-25` | `1c17888`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-014 passed; negative line totals now raise invalid_line_total before line_total_mismatch.` |
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -1771,10 +1788,16 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Nenhum contrato específico para `line_number` foi introduzido.
 * O item inválido não é retornado, adicionado ou acumulado.
 * `TEST-001` a `TEST-013` passam juntos.
-* `SCN-014` é uma nova expansão comportamental planejada para `line_total == "-1.00"`.
-* `FX-014` ainda não foi materializada.
-* `TEST-014` ainda não foi criado.
-* `invalid_line_total` ainda não foi comprovado pelo harness; `line_total_mismatch` permanece comprovado separadamente por `SCN-004`.
+* `FX-014` foi materializada e revisada com exatamente quatro campos, descrição `"Arroz"`, quantidade `"2"`, `unit_price == "8.50"` e `line_total == "-1.00"`.
+* `Decimal("-1.00")` é convertível e possui duas casas decimais, mas o valor é semanticamente inválido por ser negativo.
+* `TEST-014` foi inicialmente observado vermelho porque recebia `line_total_mismatch` em vez de `invalid_line_total`.
+* Uma guarda semântica localizada foi adicionada em `_parse_item_record` depois da conversão de `line_total` para `Decimal` e antes da comparação `quantity × unit_price`.
+* O parser passou a lançar `ReceiptValidationError` com o código `invalid_line_total` e uma mensagem não vazia.
+* Nenhum contrato específico para `line_number` foi criado.
+* O mesmo `Decimal` é reutilizado, sem conversão duplicada.
+* O helper lança antes de retornar; o item inválido não é adicionado nem acumulado, e a validação do total agregado não é alcançada.
+* Nenhum helper adicional foi criado e nenhuma refatoração ocorreu.
+* `TEST-001` a `TEST-014` passam juntos.
 
 Implemented and green:
 
@@ -1791,10 +1814,11 @@ Implemented and green:
 * `TEST-011` / `SCN-011`
 * `TEST-012` / `SCN-012`
 * `TEST-013` / `SCN-013`
+* `TEST-014` / `SCN-014`
 
 Planned but not yet implemented:
 
-* `TEST-014` / `SCN-014`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -1816,14 +1840,15 @@ Structured-error scenarios:
 * `SCN-011`
 * `SCN-012`
 * `SCN-013`
+* `SCN-014`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-013` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-013` estão verdes.
+`SCN-010` a `SCN-014` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões, `TEST-001` a `TEST-014` estão verdes.
 
-`SCN-014` é a próxima expansão planejada. Seus artefatos e seu comportamento ainda não estão implementados nem verdes.
+Não existem testes pendentes no harness atualmente materializado.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
