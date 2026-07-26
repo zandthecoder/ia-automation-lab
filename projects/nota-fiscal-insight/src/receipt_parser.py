@@ -59,6 +59,13 @@ def _parse_item_record(
 
     decimal_unit_price = Decimal(unit_price)
     decimal_line_total = Decimal(line_total)
+
+    if decimal_line_total < 0:
+        raise ReceiptValidationError(
+            code="invalid_line_total",
+            message="Line total cannot be negative.",
+        )
+
     expected_line_total = decimal_quantity * decimal_unit_price
 
     if expected_line_total != decimal_line_total:
