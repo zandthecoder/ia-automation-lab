@@ -124,6 +124,21 @@ def parse_receipt(raw_text: str) -> dict:
             message="Receipt input is empty.",
         )
 
+    total_records = [
+        (line_number, line_text)
+        for line_number, line_text in normalized_lines
+        if line_text.startswith("TOTAL:")
+    ]
+
+    if len(total_records) > 1:
+        second_total_line_number, _ = total_records[1]
+
+        raise ReceiptValidationError(
+            code="duplicate_total",
+            message="Receipt contains more than one TOTAL record.",
+            line_number=second_total_line_number,
+        )
+
     merchant_line_number, merchant_line = normalized_lines[0]
     date_line_number, date_line = normalized_lines[1]
     total_line_number, total_line = normalized_lines[-1]
