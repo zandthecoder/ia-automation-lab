@@ -63,6 +63,9 @@ NEGATIVE_LINE_TOTAL_FIXTURE_PATH = (
 INVALID_RECEIPT_TOTAL_FORMAT_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_receipt_total_format.txt"
 )
+INVALID_LINE_TOTAL_FORMAT_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_line_total_format.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -252,5 +255,18 @@ def test_reject_receipt_total_with_comma_decimal_separator():
     error = exc_info.value
 
     assert error.code == "invalid_receipt_total"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_non_convertible_line_total():
+    raw_text = INVALID_LINE_TOTAL_FORMAT_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "invalid_line_total"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
