@@ -530,6 +530,146 @@ line_number: 3
 
 Os testes devem validar principalmente o `code`. A mensagem pode fornecer contexto humano, mas não deve ser usada como único contrato automatizado.
 
+## Structural Error Precedence
+
+Esta seção define uma política mínima e determinística para classificar um defeito estrutural principal isolado. Presença é diferente de posição, e duplicidade é diferente de conteúdo inesperado.
+
+### Classification policy
+
+| Condition                                                      | Public error                |
+| -------------------------------------------------------------- | --------------------------- |
+| Required recognized record has zero occurrences                | Corresponding `missing_*`   |
+| Singleton recognized record has more than one occurrence       | Corresponding `duplicate_*` |
+| Recognized records have valid cardinality but invalid sequence | `invalid_record_order`      |
+| Prefix or line cannot be classified as a recognized record     | `unexpected_record`         |
+
+Specific absence and duplication errors take precedence over `invalid_record_order` when the same structural fact could otherwise be described by both.
+
+Conceitualmente, a classificação segue esta sequência:
+
+1. normalizar as linhas;
+2. reconhecer o tipo estrutural de cada registro;
+3. detectar entrada vazia;
+4. verificar a ausência dos registros obrigatórios;
+5. verificar a cardinalidade dos registros singleton;
+6. verificar a ordem dos registros reconhecidos;
+7. validar o conteúdo dos registros;
+8. executar validações numéricas e matemáticas.
+
+Essa sequência descreve a classificação conceitual dos erros. Ela não exige múltiplas passagens, uma máquina de estados específica nem outra arquitetura interna. A implementação pode preservar seu desenho, desde que produza os códigos públicos definidos.
+
+### Missing required records
+
+Quando nenhuma ocorrência de `MERCHANT` existir em toda a entrada, `missing_merchant` deve prevalecer sobre `invalid_record_order`, mesmo que outro registro reconhecido apareça na primeira linha:
+
+```text
+DATE: 2026-07-19
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+→ missing_merchant
+```
+
+Essa regra depende da ausência global de `MERCHANT`. Quando `MERCHANT` existe exatamente uma vez, mas está deslocado, a entrada possui cardinalidade válida e sequência proibida:
+
+```text
+DATE: 2026-07-19
+MERCHANT: Mercado Exemplo
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+→ invalid_record_order
+```
+
+Quando nenhuma ocorrência de `DATE` existir em toda a entrada, `missing_date` deve prevalecer sobre `invalid_record_order`, mesmo que `ITEM` apareça imediatamente depois de `MERCHANT`:
+
+```text
+MERCHANT: Mercado Exemplo
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+→ missing_date
+```
+
+Essa regra depende da ausência global de `DATE`. Quando `DATE` existe exatamente uma vez, mas está deslocada, o resultado permanece `invalid_record_order`.
+
+O contrato comprovado de `SCN-018` permanece inalterado e constitui um exemplo concreto da mesma política:
+
+```text
+MERCHANT
+DATE
+ITEM
+fim da entrada
+→ missing_total
+```
+
+Nenhuma ocorrência de um registro obrigatório produz o erro `missing_*` correspondente, depois dos contratos anteriores aplicáveis. Nenhum identificador ou comportamento de `SCN-018` é alterado por esta seção.
+
+### Duplicate singleton records
+
+Para os registros obrigatórios singleton `MERCHANT`, `DATE` e `TOTAL`, uma ocorrência reconhecida repetida deve produzir o código específico de duplicidade:
+
+```text
+segunda ocorrência de MERCHANT
+→ duplicate_merchant
+
+segunda ocorrência de DATE
+→ duplicate_date
+
+segunda ocorrência de TOTAL
+→ duplicate_total
+```
+
+A duplicidade reconhecida prevalece sobre uma classificação genérica de `invalid_record_order` causada pela mesma ocorrência repetida.
+
+Em particular:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-19
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+TOTAL: 10.00
+→ duplicate_total
+```
+
+O segundo `TOTAL` é um registro de tipo reconhecido. Ele não deve ser classificado como `unexpected_record` nem apenas como `invalid_record_order`.
+
+### Invalid order and unexpected records
+
+`invalid_record_order` deve ser usado quando os registros obrigatórios relevantes existem, suas cardinalidades estão corretas e registros reconhecidos aparecem em sequência proibida.
+
+`unexpected_record` deve ser usado quando uma linha não vazia possui prefixo desconhecido, não possui prefixo válido ou não pode ser classificada como um dos tipos reconhecidos:
+
+```text
+COUPON: 5.00
+→ unexpected_record
+```
+
+Um registro reconhecido em posição proibida, mas não duplicado, produz `invalid_record_order`. Um registro singleton reconhecido e repetido produz seu código `duplicate_*`.
+
+### Isolated defects and line numbers
+
+Esta política define cenários com um defeito estrutural principal isolado. Ela não estabelece prioridade geral entre defeitos independentes simultâneos, incluindo:
+
+* `MERCHANT` ausente e prefixo desconhecido na mesma entrada;
+* `DATE` ausente e `TOTAL` duplicado;
+* `TOTAL` duplicado e outro registro desconhecido;
+* múltiplos registros obrigatórios ausentes;
+* duplicidades de mais de um tipo;
+* erro estrutural e erro numérico na mesma entrada.
+
+Essas combinações exigem cenários específicos antes de se tornarem contratos executáveis.
+
+Esta política também não cria novos requisitos para `line_number`. Erros `missing_*` podem não corresponder a uma linha física, e erros `duplicate_*` podem naturalmente identificar a ocorrência repetida, mas a versão atual desta SPEC não torna esses valores obrigatórios. Cenários futuros poderão definir `line_number` separadamente quando necessário.
+
+### Unblocked future planning
+
+Esta decisão permite planejar separadamente cenários futuros para:
+
+* `missing_merchant`;
+* `missing_date`;
+* `duplicate_total`.
+
+Esses cenários ainda não estão implementados nem recebem identificadores de cenário ou teste nesta SPEC.
+
 ## Invalid Inputs and Error Behavior
 
 ### ERR-001 — `empty_input`
