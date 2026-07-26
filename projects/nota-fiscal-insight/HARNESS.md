@@ -586,11 +586,11 @@ segunda ocorrência reconhecida de TOTAL
 
 ### FX-020 — Receipt without MERCHANT
 
-**Status:** planned, not materialized
+**Status:** materialized and reviewed
 
-**Planned file:** `fixtures/inputs/invalid_missing_merchant.txt`
+**File:** `fixtures/inputs/invalid_missing_merchant.txt`
 
-Conteúdo planejado:
+Conteúdo materializado:
 
 ```text
 DATE: 2026-07-20
@@ -609,7 +609,7 @@ zero ocorrências de MERCHANT
 → missing_merchant
 ```
 
-`FX-020` ainda não existe no repositório.
+`FX-020` foi materializada e revisada no repositório.
 
 ## Expected Output Manifest
 
@@ -1281,7 +1281,7 @@ Essa evidência é específica à cardinalidade de `TOTAL` e não constitui uma 
 
 ### SCN-020 — Receipt without MERCHANT
 
-**Status:** planned, not implemented
+**Status:** implemented and green
 
 **Covers:** `ERR-002`, `BR-001`, `AC-008`, `missing_merchant`, Error Contract
 
@@ -1317,7 +1317,7 @@ Essa evidência é específica à cardinalidade de `TOTAL` e não constitui uma 
 * o parser não retorna normalmente;
 * nenhum resultado estruturado é retornado.
 
-O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-020`. A ausência global de `MERCHANT` não corresponde necessariamente a uma linha física, e o futuro `TEST-020` não deverá exigir `error.line_number == 1`, `error.line_number is None` nem qualquer outro valor.
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-020`. A ausência global de `MERCHANT` não corresponde necessariamente a uma linha física, e `TEST-020` não exige `error.line_number == 1`, `error.line_number is None` nem qualquer outro valor.
 
 #### Absence versus empty content
 
@@ -1377,7 +1377,7 @@ empty_input
 
 Para `FX-020`, a entrada não está vazia, os três registros presentes possuem prefixos reconhecidos e a contagem global de `MERCHANT` é zero. `missing_merchant` deve ser emitido antes da classificação genérica de ordem, sem retorno normal.
 
-Essa sequência descreve o contrato e não exige uma implementação em múltiplas passagens. A SPEC já contém o código e a política; `SCN-020` apenas planeja sua comprovação executável.
+Essa sequência descreve o contrato e não exige uma implementação em múltiplas passagens. A SPEC contém o código e a política, e `SCN-020` agora comprova esse comportamento no harness executável.
 
 O cenário isola um único defeito. Não define precedência para combinações com `DATE`, `ITEM` ou `TOTAL` ausente; `TOTAL` duplicado; prefixo desconhecido; item inválido; erro numérico; ou `MERCHANT` duplicado.
 
@@ -1822,7 +1822,7 @@ Antes da implementação, `TEST-019` ficou vermelho ao comparar o código espera
 
 ### TEST-020 — Reject receipt without MERCHANT
 
-**Status:** planned, not implemented
+**Status:** implemented and green
 
 **Covers:** `SCN-020`, `ERR-002`, `BR-001`, `AC-008`, `missing_merchant`, Error Contract
 
@@ -1848,9 +1848,9 @@ Antes da implementação, `TEST-019` ficou vermelho ao comparar o código espera
 * nenhum resultado estruturado é produzido;
 * nenhum requisito específico é imposto a `line_number`.
 
-O teste deverá aceitar somente `missing_merchant`, sem códigos alternativos.
+O teste aceita somente `missing_merchant`, sem códigos alternativos.
 
-**Expected Red with the current implementation:**
+**Observed Red before implementation:**
 
 ```text
 ReceiptValidationError
@@ -1859,13 +1859,13 @@ message: Record is out of order; expected MERCHANT on line 1.
 line_number: 1
 ```
 
-O futuro `TEST-020` deverá ficar vermelho ao comparar `missing_merchant` com `invalid_record_order`. Esse Red demonstrará que o parser já rejeita a entrada e valida a primeira posição esperada, mas ainda não distingue ausência global de deslocamento.
+`TEST-020` ficou vermelho ao comparar `missing_merchant` com `invalid_record_order`. Esse Red demonstrou que o parser já rejeitava a entrada e validava a primeira posição esperada, mas ainda não distinguia ausência global de deslocamento. Depois da guarda de ausência global, o teste passou com `missing_merchant`.
 
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
 
-Para `AC-008`, deve existir cobertura para a ausência de cada registro obrigatório: `MERCHANT`, `DATE`, `ITEM` e `TOTAL`. `TEST-006` cobre `missing_item` e `TEST-018` cobre `missing_total`; portanto, ainda são necessários incrementos futuros para `missing_merchant` e `missing_date` antes de considerar `AC-008` completamente coberto.
+Para `AC-008`, deve existir cobertura para a ausência de cada registro obrigatório: `MERCHANT`, `DATE`, `ITEM` e `TOTAL`. `TEST-006` cobre `missing_item`, `TEST-018` cobre `missing_total` e `TEST-020` cobre `missing_merchant`; portanto, ainda é necessário um incremento futuro para `missing_date` antes de considerar `AC-008` completamente coberto.
 
 `empty_input` foi promovido da lista genérica futura para o cenário formal `SCN-010` / `FX-010` / `TEST-010`, que está implementado e verde.
 
@@ -1887,7 +1887,7 @@ O caso não convertível de `invalid_unit_price` foi promovido para o cenário f
 
 `duplicate_total` foi promovido para o cenário formal `SCN-019` / `FX-019` / `TEST-019`, que está materializado, implementado e verde.
 
-`missing_merchant` foi promovido para o cenário planejado `SCN-020` / `FX-020` / `TEST-020`. A fixture ainda não foi materializada, o teste ainda não foi criado e o contrato ainda não está protegido pelo harness executável.
+`missing_merchant` foi promovido para `SCN-020` / `FX-020` / `TEST-020`, que estão materializados, implementados e verdes.
 
 Exemplo de tabela futura:
 
@@ -2141,7 +2141,7 @@ O item pode ser validado e acumulado internamente, mas o fim da entrada é detec
 
 A positividade de `quantity` e de `unit_price` é um contrato explícito ainda sem teste. Valores zero ou negativos podem introduzir erros concorrentes em `line_total` e `receipt_total`, portanto esses cenários permanecem adiados até uma decisão própria de precedência. `SCN-018` foi priorizado por isolar uma única falha estrutural e não elimina nem redefine os contratos numéricos.
 
-A precedência específica de `duplicate_total` sobre `invalid_record_order` para a mesma ocorrência repetida foi definida pela SPEC e comprovada por `SCN-019`. Permanecem sem cenário executável `missing_merchant`, `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, outras ordens estruturais e as precedências entre defeitos independentes simultâneos.
+A precedência específica de `duplicate_total` sobre `invalid_record_order` para a mesma ocorrência repetida foi definida pela SPEC e comprovada por `SCN-019`. `missing_merchant` é comprovado por `SCN-020`; permanecem sem cenário executável `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, outras ordens estruturais e as precedências entre defeitos independentes simultâneos.
 
 ## Invariant Validation
 
@@ -2195,6 +2195,7 @@ Implemented error contract:
 * `line_total_mismatch`
 * `receipt_total_mismatch`
 * `missing_item`
+* `missing_merchant`
 * `missing_total`
 * `duplicate_total`
 * `invalid_record_order`
@@ -2208,13 +2209,12 @@ Implemented error contract:
 
 Specified but not yet implemented or protected:
 
-* `missing_merchant`
 * `duplicate_merchant`
 * `missing_date`
 * `duplicate_date`
 * `unexpected_record`
 
-Os demais contratos sem cenário executável também não devem ser interpretados como implementados. `SCN-019` comprova somente `duplicate_total`; nenhuma outra duplicidade foi implementada. `SCN-020` planeja `missing_merchant`, mas ainda não o comprova.
+Os demais contratos sem cenário executável também não devem ser interpretados como implementados. `SCN-019` comprova somente `duplicate_total`; nenhuma outra duplicidade foi implementada. `SCN-020` comprova somente a ausência global de `MERCHANT`, sem implementar conteúdo vazio ou outras ausências.
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
@@ -2236,25 +2236,21 @@ Fluxo atualmente comprovado pelos testes:
 
 1. enumerar e normalizar as linhas preservando seus números originais;
 2. detectar entrada vazia;
-3. reconhecer ocorrências estruturais relevantes pelo prefixo `TOTAL:`;
-4. detectar mais de uma ocorrência de `TOTAL`;
-5. emitir `duplicate_total` antes da classificação posicional genérica;
-6. validar `MERCHANT`, `DATE` e a sequência de registros `ITEM`;
-7. validar estrutura e campos de cada item;
-8. validar e converter os valores numéricos do item;
-9. rejeitar itens inválidos antes de adicioná-los;
-10. confirmar a existência de pelo menos um item;
-11. detectar o fim da entrada sem `TOTAL`;
-12. emitir `missing_total`;
-13. quando existe exatamente um `TOTAL`, convertê-lo usando `_convert_decimal`;
-14. emitir `invalid_receipt_total` em falha de conversão;
-15. comparar o total agregado com a soma dos itens;
-16. emitir `receipt_total_mismatch` em divergência;
-17. produzir a saída estruturada somente quando todo o contrato é válido.
+3. reconhecer ocorrências estruturais relevantes nas linhas normalizadas;
+4. detectar zero ocorrências de `MERCHANT`;
+5. emitir `missing_merchant` antes da classificação posicional;
+6. detectar mais de uma ocorrência de `TOTAL` e emitir `duplicate_total`;
+7. validar a ordem dos registros quando os contratos anteriores não se aplicam;
+8. processar e validar os registros `ITEM`;
+9. confirmar a existência de pelo menos um item;
+10. detectar o fim da entrada sem `TOTAL` e emitir `missing_total`;
+11. quando existe exatamente um `TOTAL`, validá-lo e convertê-lo;
+12. emitir os erros numéricos ou matemáticos aplicáveis;
+13. produzir a saída estruturada somente quando estrutura e conteúdo são válidos.
 
 A normalização mantém uma associação equivalente a `(original_line_number, normalized_text)`. Linhas vazias são removidas da sequência lógica, registros não vazios mantêm o número original, a validação estrutural usa o texto normalizado e os erros continuam reportando a posição original no arquivo.
 
-Esse fluxo descreve o comportamento coberto pelos testes atuais, não uma arquitetura definitiva. A detecção de `duplicate_total` usa as linhas já normalizadas e ocorre antes da validação posicional que produzia o Red, sem converter o conteúdo de qualquer `TOTAL`.
+Esse fluxo descreve o comportamento coberto pelos testes atuais, não uma arquitetura definitiva. As detecções de `missing_merchant` e `duplicate_total` usam as linhas já normalizadas e ocorrem antes da validação posicional, sem processar itens ou converter o total agregado nesses caminhos.
 
 O desenho atual evita rollback: `_parse_item_record` valida completamente o registro e lança antes de retornar quando o item é inválido. `parse_receipt` somente adiciona o item e atualiza o acumulador depois do retorno bem-sucedido; portanto, itens inválidos não deixam estado parcial observável.
 
@@ -2559,7 +2555,7 @@ Esta sequência foi concluída. `FX-019` foi materializada, `TEST-019` expôs in
 9. Executar a suíte completa.
 10. Registrar as evidências no harness.
 
-Somente a primeira etapa foi concluída nesta tarefa documental. `FX-020`, `TEST-020` e o comportamento `missing_merchant` ainda não foram materializados ou implementados.
+Esta sequência foi concluída. `FX-020` foi materializada, `TEST-020` expôs inicialmente `invalid_record_order`, a guarda de ausência global passou a emitir `missing_merchant` antes da validação posicional, e `TEST-001` a `TEST-020` passam juntos.
 
 ## TDD Workflow
 
@@ -2747,8 +2743,9 @@ Mesmo com todos os testes passando:
 | `2026-07-26` | `a6f49e0`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-017 passed; non-convertible unit prices now translate InvalidOperation to invalid_unit_price.` |
 | `2026-07-26` | `8ef261e`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-018 passed; receipts without a TOTAL record now produce missing_total instead of invalid_record_order.` |
 | `2026-07-26` | `cbf9118`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-019 passed; duplicate TOTAL records now produce duplicate_total before generic order validation.` |
+| `2026-07-26` | `971154e`     | `.\.venv\Scripts\python.exe -m pytest -q`                                                                                                                                                           | `pass`            | `TEST-001 through TEST-020 passed; receipts with no MERCHANT record now produce missing_merchant before positional order validation.` |
 
-Na validação de `2026-07-26`, o pytest também informou que não pôde criar `.pytest_cache` devido a `WinError 5`; o warning ambiental foi não bloqueante. Com `SCN-019`, os dezenove testes passaram.
+Na validação de `2026-07-26`, o pytest também informou que não pôde criar `.pytest_cache` devido a `WinError 5`; o warning ambiental foi não bloqueante. Com `SCN-020`, os vinte testes passaram.
 
 Esta tabela é opcional e não deve registrar todas as execuções locais.
 
@@ -2900,11 +2897,16 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * `TEST-019` não estabelece requisito específico para `line_number`.
 * Nenhum dos totais é escolhido silenciosamente, e nenhuma saída estruturada é retornada.
 * `TEST-001` a `TEST-019` passam juntos.
-* `SCN-020` foi formalizado como uma nova expansão estrutural planejada para `missing_merchant`.
-* `FX-020` ainda não foi materializada, e `TEST-020` ainda não foi criado.
-* `missing_merchant` está especificado, mas ainda não foi comprovado pelo harness executável.
-* O comportamento atual provável para uma entrada sem qualquer `MERCHANT` é `invalid_record_order`, com a mensagem indicando `MERCHANT` esperado na linha 1.
-* `TEST-001` a `TEST-019` continuam verdes; nenhuma evidência de implementação foi atribuída a `SCN-020`.
+* `FX-020` foi materializada e revisada em `fixtures/inputs/invalid_missing_merchant.txt` com exatamente três linhas: `DATE`, `ITEM` e `TOTAL`, sem qualquer ocorrência de `MERCHANT`.
+* O `ITEM` possui quatro campos válidos, satisfaz `quantity × unit_price == line_total`, e o único `TOTAL` corresponde ao item.
+* `TEST-020` foi inicialmente observado vermelho com `invalid_record_order` e a mensagem indicando `MERCHANT` esperado na linha 1; o parser rejeitava a entrada, mas classificava incorretamente a ausência global.
+* A implementação passou a reconhecer ocorrências pelo prefixo estrutural `MERCHANT:` depois de `empty_input` e antes da validação posicional.
+* Quando a contagem global é zero, a interface pública lança `ReceiptValidationError` com `error.code == "missing_merchant"` e mensagem não vazia.
+* Nenhum requisito específico para `line_number` foi criado; nenhum item ou total agregado é processado depois da detecção, e nenhum resultado estruturado é retornado.
+* Ausência global (`DATE → ITEM → TOTAL`) produz `missing_merchant`; um `MERCHANT` existente, mas deslocado (`DATE → MERCHANT → ITEM → TOTAL`), continua produzindo `invalid_record_order`.
+* Uma entrada sem linhas significativas continua produzindo `empty_input` antes de `missing_merchant`. `SCN-020` possui um item e um total válidos, portanto não redefine `missing_item`, `missing_total` ou `duplicate_total`.
+* Nenhuma linha `MERCHANT` produz `missing_merchant`; `MERCHANT:` vazio é uma ocorrência estrutural existente e permanece fora do escopo de `SCN-020`.
+* `TEST-001` a `TEST-020` passam juntos.
 
 Implemented and green:
 
@@ -2927,10 +2929,11 @@ Implemented and green:
 * `TEST-017` / `SCN-017`
 * `TEST-018` / `SCN-018`
 * `TEST-019` / `SCN-019`
+* `TEST-020` / `SCN-020`
 
 Planned but not yet implemented:
 
-* `TEST-020` / `SCN-020`
+* None in the currently materialized harness.
 
 ### Resumo dos artefatos cobertos
 
@@ -2958,18 +2961,19 @@ Structured-error scenarios:
 * `SCN-017`
 * `SCN-018`
 * `SCN-019`
+* `SCN-020`
 
 ### Estado do harness inicial
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-019` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-019` estão verdes.
+`SCN-010` a `SCN-020` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-020` estão verdes.
 
-Não existem testes pendentes entre os artefatos atualmente materializados. `TEST-020` está planejado, mas `FX-020` e o próprio teste ainda não existem no repositório.
+Não existem testes pendentes entre os artefatos atualmente materializados. Todos os vinte testes estão verdes.
 
 ### Lacunas ainda abertas
 
-Ainda não foram materializados cenários para `missing_merchant`, `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `missing_merchant` agora possui o planejamento documental de `SCN-020`, mas ainda não possui fixture ou teste. Nenhum desses contratos é declarado como implementado por `SCN-020`.
+Ainda não foram materializados cenários para `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, conteúdo vazio de `MERCHANT`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `SCN-020` comprova somente a ausência global de `MERCHANT`; nenhuma outra ausência ou duplicidade é declarada como implementada.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
