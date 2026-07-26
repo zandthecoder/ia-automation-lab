@@ -127,6 +127,8 @@ def parse_receipt(raw_text: str) -> dict:
     merchant_line_number, merchant_line = normalized_lines[0]
     date_line_number, date_line = normalized_lines[1]
     total_line_number, total_line = normalized_lines[-1]
+    has_total = total_line.startswith("TOTAL:")
+    item_lines = normalized_lines[2:-1] if has_total else normalized_lines[2:]
 
     if not merchant_line.startswith("MERCHANT:"):
         raise ReceiptValidationError(
@@ -148,7 +150,9 @@ def parse_receipt(raw_text: str) -> dict:
             line_number=date_line_number,
         )
 
-    if not total_line.startswith("TOTAL:"):
+    if not has_total and any(
+        not item_line.startswith("ITEM:") for _, item_line in item_lines
+    ):
         raise ReceiptValidationError(
             code="invalid_record_order",
             message=(
@@ -158,7 +162,7 @@ def parse_receipt(raw_text: str) -> dict:
             line_number=total_line_number,
         )
 
-    for line_number, item_line in normalized_lines[2:-1]:
+    for line_number, item_line in item_lines:
         if not item_line.startswith("ITEM:"):
             raise ReceiptValidationError(
                 code="invalid_record_order",
@@ -172,7 +176,7 @@ def parse_receipt(raw_text: str) -> dict:
     items = []
     calculated_receipt_total = Decimal("0")
 
-    for line_number, item_line in normalized_lines[2:-1]:
+    for line_number, item_line in item_lines:
         item, decimal_line_total = _parse_item_record(item_line, line_number)
 
         items.append(item)
@@ -182,6 +186,12 @@ def parse_receipt(raw_text: str) -> dict:
         raise ReceiptValidationError(
             code="missing_item",
             message="Receipt must contain at least one item.",
+        )
+
+    if not has_total:
+        raise ReceiptValidationError(
+            code="missing_total",
+            message="Receipt total record is missing.",
         )
 
     receipt_total = total_line.removeprefix("TOTAL:").strip()
