@@ -78,6 +78,9 @@ INVALID_DUPLICATE_TOTAL_FIXTURE_PATH = (
 INVALID_MISSING_MERCHANT_FIXTURE_PATH = (
     PROJECT_ROOT / "fixtures" / "inputs" / "invalid_missing_merchant.txt"
 )
+INVALID_MISSING_DATE_FIXTURE_PATH = (
+    PROJECT_ROOT / "fixtures" / "inputs" / "invalid_missing_date.txt"
+)
 
 
 def test_parse_valid_single_item_receipt():
@@ -332,5 +335,18 @@ def test_reject_receipt_without_merchant():
     error = exc_info.value
 
     assert error.code == "missing_merchant"
+    assert isinstance(error.message, str)
+    assert error.message.strip() != ""
+
+
+def test_reject_receipt_without_date():
+    raw_text = INVALID_MISSING_DATE_FIXTURE_PATH.read_text(encoding="utf-8")
+
+    with pytest.raises(ReceiptValidationError) as exc_info:
+        parse_receipt(raw_text)
+
+    error = exc_info.value
+
+    assert error.code == "missing_date"
     assert isinstance(error.message, str)
     assert error.message.strip() != ""
