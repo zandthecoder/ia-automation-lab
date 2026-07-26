@@ -292,6 +292,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-018` | `fixtures/inputs/invalid_missing_total.txt` | `SCN-018`              | Nota sem o registro obrigatório `TOTAL`.        |              no |
 | `FX-019` | `fixtures/inputs/invalid_duplicate_total.txt` | `SCN-019`            | Nota válida com segunda ocorrência reconhecida de `TOTAL`. |              no |
 | `FX-020` | `fixtures/inputs/invalid_missing_merchant.txt` | `SCN-020`           | Nota válida nos demais registros, sem qualquer `MERCHANT`. |              no |
+| `FX-021` | `fixtures/inputs/invalid_missing_date.txt` | `SCN-021`               | Nota válida nos demais registros, sem qualquer `DATE`. |                  no |
 
 ## Fixture Contents
 
@@ -611,6 +612,31 @@ zero ocorrências de MERCHANT
 
 `FX-020` foi materializada e revisada no repositório.
 
+### FX-021 — Receipt without DATE
+
+**Status:** planned, not materialized
+
+**Planned file:** `fixtures/inputs/invalid_missing_date.txt`
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+```
+
+A entrada planejada possui exatamente três linhas. Existe exatamente um `MERCHANT`, um `ITEM` e um `TOTAL`, e não existe prefixo `DATE` em nenhuma posição. `MERCHANT` possui conteúdo não vazio, não há registros duplicados, prefixos desconhecidos, conteúdo depois de `TOTAL` ou outro defeito estrutural intencional.
+
+A linha `ITEM` possui três separadores `|` e quatro campos: `description == "Arroz"`, `quantity == "1"`, `unit_price == "10.00"` e `line_total == "10.00"`. Os valores são positivos e convertíveis, `1 × 10.00 == 10.00`, e `TOTAL == "10.00"` corresponde ao item. Somente `DATE` está ausente.
+
+```text
+zero ocorrências de DATE
+→ missing_date
+```
+
+`FX-021` ainda não existe no repositório. Uma linha `DATE:` vazia não faz parte desta fixture porque representaria um registro estruturalmente presente com conteúdo vazio.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -750,6 +776,7 @@ zero ocorrências de MERCHANT
 | `AC-008`             | `SCN-018`            | `ERR-015`, `missing_total` | `FX-018` | N/A                  | `TEST-018`             |
 | N/A                  | `SCN-019`            | `ERR-016`, `BR-001`, `duplicate_total` | `FX-019` | N/A          | `TEST-019`             |
 | `AC-008`             | `SCN-020`            | `ERR-002`, `BR-001`, `missing_merchant` | `FX-020` | N/A         | `TEST-020`             |
+| `AC-008`             | `SCN-021`            | `ERR-005`, `BR-001`, `missing_date` | `FX-021` | N/A             | `TEST-021`             |
 
 ## Scenario Expansion
 
@@ -1381,6 +1408,108 @@ Essa sequência descreve o contrato e não exige uma implementação em múltipl
 
 O cenário isola um único defeito. Não define precedência para combinações com `DATE`, `ITEM` ou `TOTAL` ausente; `TOTAL` duplicado; prefixo desconhecido; item inválido; erro numérico; ou `MERCHANT` duplicado.
 
+### SCN-021 — Receipt without DATE
+
+**Status:** planned, not implemented
+
+**Covers:** `ERR-005`, `BR-001`, `AC-008`, `missing_date`, Error Contract
+
+**Given**
+
+* a entrada não está vazia;
+* existe exatamente um `MERCHANT` com `"Mercado Exemplo"`;
+* não existe qualquer registro `DATE`;
+* existe exatamente um `ITEM` com quatro campos;
+* `description == "Arroz"`;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* `quantity × unit_price == line_total`;
+* existe exatamente um `TOTAL` com `"10.00"`;
+* o total corresponde à soma dos itens;
+* todos os prefixos presentes são reconhecidos;
+* o único defeito intencional é a ausência global de `DATE`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "missing_date"`;
+* `error.message` é uma string não vazia e legível;
+* `invalid_record_order` não é emitido;
+* `missing_merchant` não é emitido;
+* `missing_item` não é emitido;
+* `missing_total` não é emitido;
+* `duplicate_total` não é emitido;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é retornado.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato de `SCN-021`. A ausência global de `DATE` não corresponde necessariamente a uma linha física, e o futuro `TEST-021` não deverá exigir `error.line_number == 2`, `error.line_number is None` nem qualquer outro valor.
+
+#### Absence versus empty content
+
+```text
+MERCHANT
+ITEM
+TOTAL
+→ missing_date
+```
+
+Nenhum registro `DATE` foi encontrado. Isso é diferente de:
+
+```text
+MERCHANT
+DATE:
+ITEM
+TOTAL
+```
+
+Nesse segundo caso, o registro existe estruturalmente, mas seu conteúdo está vazio. `SCN-021` não formaliza esse contrato.
+
+#### Absence versus invalid order
+
+```text
+MERCHANT
+ITEM
+TOTAL
+→ missing_date
+```
+
+Quando a contagem global de `DATE` é zero, a ausência específica prevalece sobre `invalid_record_order`.
+
+```text
+MERCHANT
+ITEM
+DATE
+TOTAL
+→ invalid_record_order
+```
+
+Quando `DATE` existe exatamente uma vez, mas está deslocada, sua cardinalidade está correta e a sequência é proibida.
+
+`SCN-021` contém um `MERCHANT`, um `ITEM` e um `TOTAL` válidos. Portanto, não representa `missing_merchant`, `missing_item`, `missing_total` ou `duplicate_total`. O fato de `ITEM` ocupar a segunda linha não significa que o item esteja ausente.
+
+#### Protected structural precedence
+
+```text
+empty_input
+→ reconhecer os tipos dos registros
+→ verificar registros obrigatórios ausentes
+→ missing_merchant quando não existe MERCHANT
+→ missing_date quando não existe DATE
+→ verificar duplicidades
+→ verificar ordem quando as cardinalidades são válidas
+→ invalid_record_order
+→ validar conteúdos
+```
+
+Para `FX-021`, a entrada não está vazia, `MERCHANT`, `ITEM` e `TOTAL` possuem tipos reconhecidos, `MERCHANT` está presente e a contagem global de `DATE` é zero. `missing_date` deve ser emitido antes da classificação genérica de ordem, sem retorno normal.
+
+Essa sequência descreve o contrato, sem exigir uma arquitetura específica. `SCN-021` não estabelece precedência para uma entrada que omita simultaneamente `MERCHANT` e `DATE`, nem para combinações com `ITEM` ou `TOTAL` ausente, `TOTAL` duplicado, prefixo desconhecido, item inválido, erro numérico, `DATE` duplicada ou `MERCHANT` duplicado.
+
 ## Test Cases
 
 ### TEST-001 — Parse valid single-item receipt
@@ -1860,6 +1989,48 @@ line_number: 1
 ```
 
 `TEST-020` ficou vermelho ao comparar `missing_merchant` com `invalid_record_order`. Esse Red demonstrou que o parser já rejeitava a entrada e validava a primeira posição esperada, mas ainda não distinguia ausência global de deslocamento. Depois da guarda de ausência global, o teste passou com `missing_merchant`.
+
+### TEST-021 — Reject receipt without DATE
+
+**Status:** planned, not implemented
+
+**Covers:** `SCN-021`, `ERR-005`, `BR-001`, `AC-008`, `missing_date`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-021`
+
+**Expected error:** `missing_date`
+
+**Execution:**
+
+1. Carregar `invalid_missing_date.txt` como texto UTF-8.
+2. Chamar somente `parse_receipt(raw_text)`.
+3. Exigir e capturar `ReceiptValidationError`.
+
+**Pass condition:**
+
+* `error.code == "missing_date"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* `invalid_record_order` não é aceito;
+* `missing_merchant` não é aceito;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é produzido;
+* nenhum requisito específico é imposto a `line_number`.
+
+O futuro teste deverá aceitar somente `missing_date`, sem códigos alternativos.
+
+**Expected Red with the current implementation:**
+
+```text
+ReceiptValidationError
+code: invalid_record_order
+message: Record is out of order; expected DATE on line 2.
+line_number: 2
+```
+
+O futuro `TEST-021` deverá ficar vermelho ao comparar `missing_date` com `invalid_record_order`. Esse Red provável demonstrará que o parser já rejeita a entrada e valida a segunda posição esperada, mas ainda não distingue ausência global de deslocamento para `DATE`. Caso outro Red seja observado, ele deverá ser registrado sem alteração artificial.
 
 ## Additional Error Validation
 
@@ -2557,6 +2728,22 @@ Esta sequência foi concluída. `FX-019` foi materializada, `TEST-019` expôs in
 
 Esta sequência foi concluída. `FX-020` foi materializada, `TEST-020` expôs inicialmente `invalid_record_order`, a guarda de ausência global passou a emitir `missing_merchant` antes da validação posicional, e `TEST-001` a `TEST-020` passam juntos.
 
+## TDD Sequence for SCN-021
+
+1. Formalizar `SCN-021` no harness.
+2. Criar `FX-021` sem qualquer registro `DATE`.
+3. Criar `TEST-021` exigindo `missing_date`.
+4. Executar `TEST-021` e registrar o código público atual.
+5. Confirmar o Red de `invalid_record_order`.
+6. Implementar a detecção mínima de ausência global de `DATE`.
+7. Preservar `invalid_record_order` quando `DATE` existe, mas está deslocada.
+8. Preservar `missing_merchant` para zero ocorrências de `MERCHANT`.
+9. Executar `TEST-021` e os testes estruturais anteriores.
+10. Executar a suíte completa.
+11. Registrar as evidências no harness.
+
+Somente a primeira etapa foi concluída nesta tarefa documental. `FX-021`, `TEST-021` e o comportamento `missing_date` ainda não foram materializados ou implementados.
+
 ## TDD Workflow
 
 Para cada comportamento:
@@ -2907,6 +3094,11 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Uma entrada sem linhas significativas continua produzindo `empty_input` antes de `missing_merchant`. `SCN-020` possui um item e um total válidos, portanto não redefine `missing_item`, `missing_total` ou `duplicate_total`.
 * Nenhuma linha `MERCHANT` produz `missing_merchant`; `MERCHANT:` vazio é uma ocorrência estrutural existente e permanece fora do escopo de `SCN-020`.
 * `TEST-001` a `TEST-020` passam juntos.
+* `SCN-021` foi formalizado como uma nova expansão estrutural planejada para `missing_date`.
+* `FX-021` ainda não foi materializada, e `TEST-021` ainda não foi criado.
+* `missing_date` está especificado, mas ainda não está protegido pelo harness executável.
+* O comportamento atual provável para uma entrada sem qualquer `DATE` é `invalid_record_order`, com a mensagem indicando `DATE` esperada na linha 2.
+* `TEST-001` a `TEST-020` continuam verdes; nenhuma evidência de implementação foi atribuída a `SCN-021`.
 
 Implemented and green:
 
@@ -2933,7 +3125,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-021` / `SCN-021`
 
 ### Resumo dos artefatos cobertos
 
@@ -2973,7 +3165,7 @@ Não existem testes pendentes entre os artefatos atualmente materializados. Todo
 
 ### Lacunas ainda abertas
 
-Ainda não foram materializados cenários para `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, conteúdo vazio de `MERCHANT`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `SCN-020` comprova somente a ausência global de `MERCHANT`; nenhuma outra ausência ou duplicidade é declarada como implementada.
+Ainda não foram materializados artefatos executáveis para `duplicate_merchant`, `missing_date`, `duplicate_date`, `unexpected_record`, conteúdo vazio de `MERCHANT`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `SCN-021` planeja `missing_date`, mas ainda não possui fixture ou teste; `SCN-020` comprova somente a ausência global de `MERCHANT`, e nenhuma outra ausência ou duplicidade é declarada como implementada.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
