@@ -58,7 +58,14 @@ def _parse_item_record(
         )
 
     decimal_unit_price = Decimal(unit_price)
-    decimal_line_total = Decimal(line_total)
+
+    try:
+        decimal_line_total = Decimal(line_total)
+    except InvalidOperation as exc:
+        raise ReceiptValidationError(
+            code="invalid_line_total",
+            message="Line total has an invalid numeric format.",
+        ) from exc
 
     if decimal_line_total < 0:
         raise ReceiptValidationError(
