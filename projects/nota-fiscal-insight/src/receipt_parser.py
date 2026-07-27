@@ -136,6 +136,18 @@ def parse_receipt(raw_text: str) -> dict:
             message="Receipt MERCHANT record is missing.",
         )
 
+    date_records = [
+        (line_number, line_text)
+        for line_number, line_text in normalized_lines
+        if line_text.startswith("DATE:")
+    ]
+
+    if not date_records:
+        raise ReceiptValidationError(
+            code="missing_date",
+            message="Receipt DATE record is missing.",
+        )
+
     total_records = [
         (line_number, line_text)
         for line_number, line_text in normalized_lines
