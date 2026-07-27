@@ -293,6 +293,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-019` | `fixtures/inputs/invalid_duplicate_total.txt` | `SCN-019`            | Nota válida com segunda ocorrência reconhecida de `TOTAL`. |              no |
 | `FX-020` | `fixtures/inputs/invalid_missing_merchant.txt` | `SCN-020`           | Nota válida nos demais registros, sem qualquer `MERCHANT`. |              no |
 | `FX-021` | `fixtures/inputs/invalid_missing_date.txt` | `SCN-021`               | Nota válida nos demais registros, sem qualquer `DATE`. |                  no |
+| `FX-022` | `fixtures/inputs/invalid_duplicate_merchant.txt` | `SCN-022`          | Nota válida nos demais registros, com segunda ocorrência reconhecida de `MERCHANT`. | no |
 
 ## Fixture Contents
 
@@ -637,6 +638,35 @@ zero ocorrências de DATE
 
 `FX-021` foi materializada e revisada no repositório. Uma linha `DATE:` vazia não faz parte desta fixture porque representaria um registro estruturalmente presente com conteúdo vazio.
 
+### FX-022 — Receipt with duplicate MERCHANT
+
+**Status:** planned, not materialized
+
+**Planned file:** `fixtures/inputs/invalid_duplicate_merchant.txt`
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-22
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+```
+
+A entrada planejada possui exatamente cinco linhas. As linhas 1 e 2 são duas ocorrências estruturalmente reconhecidas de `MERCHANT`, ambas com conteúdo não vazio e idêntico (`"Mercado Exemplo"`). Usar valores iguais isola a cardinalidade maior que um, sem introduzir interpretação sobre estabelecimentos conflitantes.
+
+Existe exatamente uma `DATE`, um `ITEM` e um `TOTAL`. O `ITEM` possui três separadores `|` e quatro campos válidos: `description == "Arroz"`, `quantity == "1"`, `unit_price == "10.00"` e `line_total == "10.00"`. Os valores são positivos e convertíveis, `1 × 10.00 == 10.00`, e `TOTAL == "10.00"` corresponde ao acumulado.
+
+Não existe registro obrigatório ausente, `DATE` ou `TOTAL` duplicado, prefixo desconhecido, conteúdo depois de `TOTAL` ou outro defeito estrutural, numérico ou matemático intencional. Somente a segunda ocorrência de `MERCHANT` é defeituosa.
+
+```text
+duas ocorrências reconhecidas de MERCHANT
+→ duplicate_merchant
+```
+
+`FX-022` ainda não existe no repositório. Uma linha `MERCHANT:` vazia não faz parte desta fixture porque representaria conteúdo inválido, não duas ocorrências individualmente válidas.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -777,6 +807,7 @@ zero ocorrências de DATE
 | N/A                  | `SCN-019`            | `ERR-016`, `BR-001`, `duplicate_total` | `FX-019` | N/A          | `TEST-019`             |
 | `AC-008`             | `SCN-020`            | `ERR-002`, `BR-001`, `missing_merchant` | `FX-020` | N/A         | `TEST-020`             |
 | `AC-008`             | `SCN-021`            | `ERR-005`, `BR-001`, `missing_date` | `FX-021` | N/A             | `TEST-021`             |
+| N/A                  | `SCN-022`            | `ERR-003`, `BR-001`, `duplicate_merchant` | `FX-022` | N/A        | `TEST-022`             |
 
 ## Scenario Expansion
 
@@ -1510,6 +1541,128 @@ Para `FX-021`, a entrada não está vazia, `MERCHANT`, `ITEM` e `TOTAL` possuem 
 
 Essa sequência descreve o contrato, sem exigir uma arquitetura específica. `SCN-021` não estabelece precedência para uma entrada que omita simultaneamente `MERCHANT` e `DATE`, nem para combinações com `ITEM` ou `TOTAL` ausente, `TOTAL` duplicado, prefixo desconhecido, item inválido, erro numérico, `DATE` duplicada ou `MERCHANT` duplicado.
 
+### SCN-022 — Receipt with duplicate MERCHANT
+
+**Status:** planned, not implemented
+
+**Covers:** `ERR-003`, `BR-001`, `duplicate_merchant`, Error Contract
+
+**Given**
+
+* a entrada não está vazia;
+* existem duas ocorrências estruturalmente reconhecidas de `MERCHANT`;
+* ambas contêm `"Mercado Exemplo"` e possuem conteúdo não vazio;
+* existe exatamente uma `DATE` com `"2026-07-22"`;
+* existe exatamente um `ITEM` com quatro campos;
+* `description == "Arroz"`;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* `quantity × unit_price == line_total`;
+* existe exatamente um `TOTAL` com `"10.00"`;
+* o total corresponde à soma dos itens;
+* todos os prefixos são reconhecidos;
+* o único defeito intencional é a segunda ocorrência de `MERCHANT`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "duplicate_merchant"`;
+* `error.message` é uma string não vazia e legível;
+* `invalid_record_order` não é emitido;
+* `missing_merchant` não é emitido;
+* `unexpected_record` não é emitido;
+* `missing_date` não é emitido;
+* `missing_item` não é emitido;
+* `missing_total` não é emitido;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é retornado.
+
+O texto exato da mensagem e o valor de `line_number` não fazem parte do contrato inicial de `SCN-022`. A segunda ocorrência está na linha 2, mas o futuro `TEST-022` não deverá exigir `error.line_number == 2`, `error.line_number is None` nem qualquer outro valor.
+
+#### Duplication versus absence
+
+```text
+DATE
+ITEM
+TOTAL
+→ missing_merchant
+```
+
+Zero ocorrências são protegidas por `SCN-020` / `TEST-020`.
+
+```text
+MERCHANT
+MERCHANT
+DATE
+ITEM
+TOTAL
+→ duplicate_merchant
+```
+
+Duas ocorrências são planejadas por `SCN-022` / `TEST-022`; `missing_merchant` não se aplica.
+
+#### Duplication versus invalid order
+
+```text
+DATE
+MERCHANT
+ITEM
+TOTAL
+→ invalid_record_order
+```
+
+Nesse caso existe um único `MERCHANT`, com cardinalidade válida e posição proibida.
+
+```text
+MERCHANT
+MERCHANT
+DATE
+ITEM
+TOTAL
+→ duplicate_merchant
+```
+
+Nesse caso o primeiro registro ocupa a posição correta e o segundo repete um singleton. A duplicidade específica deve prevalecer sobre a mensagem genérica de `DATE` esperada na linha 2.
+
+#### Duplication versus empty content and unknown records
+
+Uma linha `MERCHANT:` vazia representa um registro presente com conteúdo inválido e não é coberta por `SCN-022`. Em `FX-022`, as duas ocorrências contêm `"Mercado Exemplo"`.
+
+`MERCHANT:` é um prefixo estrutural conhecido também na segunda ocorrência. Portanto, a repetição produz `duplicate_merchant`, não `unexpected_record`; este último permanece reservado para prefixos desconhecidos ou linhas não classificáveis.
+
+`FX-022` contém uma única `DATE`, um único `ITEM` válido e um único `TOTAL` válido. Não representa `missing_date`, `duplicate_date`, `missing_total`, `duplicate_total`, `invalid_receipt_total` ou `receipt_total_mismatch`.
+
+#### Protected structural precedence
+
+```text
+empty_input
+→ missing_merchant quando MERCHANT possui zero ocorrências
+→ missing_date quando DATE possui zero ocorrências
+→ duplicate_merchant quando MERCHANT possui mais de uma ocorrência
+→ duplicate_total quando TOTAL possui mais de uma ocorrência
+→ invalid_record_order quando as cardinalidades protegidas são válidas
+→ validar conteúdos
+```
+
+Para `FX-022`, a entrada não está vazia, `MERCHANT` e `DATE` estão presentes e `MERCHANT` possui duas ocorrências. `duplicate_merchant` deve ser emitido antes da validação posicional da linha 2; nenhum item ou total precisa ser processado e nenhum resultado normal é produzido.
+
+A posição relativa entre `duplicate_merchant` e `duplicate_total` não é generalizada para entradas que contenham ambos os defeitos. `SCN-022` também não define precedência para `DATE` ausente ou duplicada, `ITEM` ou `TOTAL` ausente, prefixo desconhecido, item inválido, erro numérico, mais de dois `MERCHANT` ou estabelecimentos com valores diferentes.
+
+#### Structural review decision
+
+`TASK-REVIEW-007` concluiu:
+
+```text
+Decision: Keep explicit guards
+```
+
+A futura implementação de `SCN-022` deverá reutilizar o reconhecimento explícito existente de `MERCHANT`, acrescentar somente a guarda de cardinalidade necessária e manter a precedência visível em `parse_receipt`. Helper, índice estrutural, enum, classe de registro, máquina de estados e refatoração das demais guardas permanecem fora do escopo.
+
 ## Test Cases
 
 ### TEST-001 — Parse valid single-item receipt
@@ -2031,6 +2184,49 @@ line_number: 2
 ```
 
 `TEST-021` ficou vermelho ao comparar `missing_date` com `invalid_record_order`. Esse Red demonstrou que o parser já rejeitava a entrada e validava a segunda posição esperada, mas ainda não distinguia ausência global de deslocamento para `DATE`. Depois da guarda de ausência global, o teste passou com `missing_date`.
+
+### TEST-022 — Reject receipt with duplicate MERCHANT
+
+**Status:** planned, not implemented
+
+**Covers:** `SCN-022`, `ERR-003`, `BR-001`, `duplicate_merchant`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-022`
+
+**Expected error:** `duplicate_merchant`
+
+**Execution:**
+
+1. Carregar `invalid_duplicate_merchant.txt` como texto UTF-8.
+2. Chamar somente `parse_receipt(raw_text)`.
+3. Exigir e capturar `ReceiptValidationError`.
+
+**Pass condition:**
+
+* `error.code == "duplicate_merchant"`;
+* `error.message` é uma string;
+* `error.message.strip() != ""`;
+* `invalid_record_order` não é aceito;
+* `missing_merchant` não é aceito;
+* `unexpected_record` não é aceito;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é produzido;
+* nenhum requisito específico é imposto a `line_number`.
+
+O teste aceitará somente `duplicate_merchant`, sem códigos alternativos.
+
+**Expected Red before implementation:**
+
+```text
+ReceiptValidationError
+code: invalid_record_order
+message: Record is out of order; expected DATE on line 2.
+line_number: 2
+```
+
+Esse Red esperado demonstra que o parser já rejeita a segunda ocorrência de `MERCHANT`, mas ainda a classifica indiretamente como uma violação posicional. A implementação futura deverá promover a causa específica `duplicate_merchant` sem alterar o contrato de `line_number`.
 
 ## Additional Error Validation
 
@@ -2746,6 +2942,23 @@ Esta sequência foi concluída. `FX-020` foi materializada, `TEST-020` expôs in
 
 Esta sequência foi concluída. `FX-021` foi materializada, `TEST-021` expôs inicialmente `invalid_record_order`, a guarda de ausência global passou a emitir `missing_date` depois de `missing_merchant` e antes da validação posicional, e `TEST-001` a `TEST-021` passam juntos.
 
+## TDD Sequence for SCN-022
+
+1. Formalizar `SCN-022` no harness.
+2. Criar `FX-022` com dois registros `MERCHANT` idênticos e individualmente válidos.
+3. Criar `TEST-022` exigindo `duplicate_merchant`.
+4. Executar `TEST-022` e registrar o código público atual.
+5. Confirmar o Red esperado de `invalid_record_order`.
+6. Adicionar a guarda explícita mínima para mais de uma ocorrência reconhecida de `MERCHANT`.
+7. Preservar `missing_merchant` para zero ocorrências.
+8. Preservar `invalid_record_order` quando existe um único `MERCHANT` em posição proibida.
+9. Não extrair helper, índice estrutural, enum, classe de registro ou máquina de estados.
+10. Executar `TEST-022` e os testes estruturais anteriores.
+11. Executar a suíte completa.
+12. Registrar as evidências no harness.
+
+Somente a primeira etapa foi concluída. `FX-022`, `TEST-022` e o comportamento `duplicate_merchant` ainda não foram materializados nem implementados.
+
 ## TDD Workflow
 
 Para cada comportamento:
@@ -3108,6 +3321,13 @@ Esta tabela é opcional e não deve registrar todas as execuções locais.
 * Os cenários isolados comprovam `empty_input → missing_merchant → missing_date`, sem estabelecer precedência geral para uma entrada que omita simultaneamente `MERCHANT` e `DATE`.
 * `SCN-021` possui um item e um total válidos, portanto não redefine `missing_item`, `missing_total`, `duplicate_total`, `invalid_receipt_total` ou `receipt_total_mismatch`.
 * `TEST-001` a `TEST-021` passam juntos.
+* `SCN-022` formaliza o planejamento de uma nota com duas ocorrências reconhecidas, idênticas e individualmente válidas de `MERCHANT`.
+* `FX-022` está especificada, mas `fixtures/inputs/invalid_duplicate_merchant.txt` ainda não foi materializado.
+* `TEST-022` está planejado, mas ainda não foi criado nem executado.
+* `duplicate_merchant` permanece especificado e não implementado; o comportamento atual provável é `invalid_record_order`, com `DATE` esperada na linha 2 e `line_number == 2`.
+* A decisão de revisão para a implementação futura é `Decision: Keep explicit guards`.
+* A futura guarda deverá permanecer explícita em `parse_receipt`, sem helper, índice estrutural, enum, classe de registro, máquina de estados ou refatoração das guardas existentes.
+* `TEST-001` a `TEST-021` continuam sendo os testes materializados e verdes.
 
 Implemented and green:
 
@@ -3135,7 +3355,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-022` / `SCN-022`
 
 ### Resumo dos artefatos cobertos
 
@@ -3176,7 +3396,7 @@ Não existem testes pendentes entre os artefatos atualmente materializados. Todo
 
 ### Lacunas ainda abertas
 
-Ainda não foram materializados artefatos executáveis para `duplicate_merchant`, `duplicate_date`, `unexpected_record`, conteúdo vazio ou inválido de `MERCHANT`, conteúdo vazio ou inválido de `DATE`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `SCN-020` e `SCN-021` comprovam somente as ausências globais isoladas de `MERCHANT` e `DATE`; nenhuma duplicidade adicional é declarada como implementada.
+`SCN-022` agora planeja `duplicate_merchant`, mas `FX-022` e `TEST-022` ainda não foram materializados e o contrato não está implementado. Também não foram materializados artefatos executáveis para `duplicate_date`, `unexpected_record`, conteúdo vazio ou inválido de `MERCHANT`, conteúdo vazio ou inválido de `DATE`, outras ordens estruturais, positividade de `quantity`, positividade de `unit_price`, positividade de `receipt_total` e precedências entre defeitos independentes simultâneos. `SCN-020` e `SCN-021` comprovam somente as ausências globais isoladas de `MERCHANT` e `DATE`; nenhuma duplicidade adicional é declarada como implementada.
 
 O parser agora reconhece ocorrências estruturais de `MERCHANT`, `DATE` e `TOTAL`, com verificações locais de cardinalidade para mais de um tipo de registro. A repetição permanece pequena e explícita; uma revisão separada poderá avaliar se existe benefício concreto em extrair uma abstração. Nenhum helper deve ser criado apenas para reduzir linhas, e qualquer refatoração futura deverá preservar ordem, precedência, códigos públicos e números de linha já protegidos.
 
