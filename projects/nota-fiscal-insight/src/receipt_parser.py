@@ -148,6 +148,15 @@ def parse_receipt(raw_text: str) -> dict:
             message="Receipt DATE record is missing.",
         )
 
+    if len(merchant_records) > 1:
+        second_merchant_line_number, _ = merchant_records[1]
+
+        raise ReceiptValidationError(
+            code="duplicate_merchant",
+            message="Receipt contains more than one MERCHANT record.",
+            line_number=second_merchant_line_number,
+        )
+
     total_records = [
         (line_number, line_text)
         for line_number, line_text in normalized_lines
