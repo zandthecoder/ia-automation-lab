@@ -157,6 +157,15 @@ def parse_receipt(raw_text: str) -> dict:
             line_number=second_merchant_line_number,
         )
 
+    if len(date_records) > 1:
+        second_date_line_number, _ = date_records[1]
+
+        raise ReceiptValidationError(
+            code="duplicate_date",
+            message="Receipt contains more than one DATE record.",
+            line_number=second_date_line_number,
+        )
+
     total_records = [
         (line_number, line_text)
         for line_number, line_text in normalized_lines
