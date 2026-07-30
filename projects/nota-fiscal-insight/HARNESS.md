@@ -295,6 +295,7 @@ Fixtures inválidas normalmente não possuem expected output JSON, pois o result
 | `FX-021` | `fixtures/inputs/invalid_missing_date.txt` | `SCN-021`               | Nota válida nos demais registros, sem qualquer `DATE`. |                  no |
 | `FX-022` | `fixtures/inputs/invalid_duplicate_merchant.txt` | `SCN-022`          | Nota válida nos demais registros, com segunda ocorrência reconhecida de `MERCHANT`. | no |
 | `FX-023` | `fixtures/inputs/invalid_duplicate_date.txt` | `SCN-023`              | Nota válida nos demais registros, com segunda ocorrência reconhecida de `DATE`. | no |
+| `FX-024` | `fixtures/inputs/invalid_unknown_prefix_between_date_and_item.txt` | `SCN-024` | Nota válida nos demais registros, mas com prefixo desconhecido `NOTE:` entre `DATE` e `ITEM`. | no |
 
 ## Fixture Contents
 
@@ -699,6 +700,66 @@ duas ocorrências reconhecidas de DATE
 
 `FX-023` existe no repositório e foi revisada. Uma linha `DATE:` vazia não faz parte desta fixture porque representaria conteúdo inválido, não duas ocorrências individualmente válidas.
 
+### FX-024 — Receipt with unknown prefix between DATE and ITEM
+
+**Status:** planned, not materialized
+
+**Planned file:** `fixtures/inputs/invalid_unknown_prefix_between_date_and_item.txt`
+
+Conteúdo planejado:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-24
+NOTE: Cupom
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+```
+
+A entrada planejada possui exatamente cinco linhas:
+
+1. `MERCHANT:` conhecido e válido;
+2. `DATE:` conhecida e válida;
+3. `NOTE:` com prefixo desconhecido;
+4. `ITEM:` conhecido e válido;
+5. `TOTAL:` conhecido e válido.
+
+A linha `NOTE: Cupom` fica exatamente entre `DATE` e o primeiro `ITEM`. Ela não está vazia, possui dois-pontos e conteúdo não vazio, mas `NOTE:` não pertence ao vocabulário estrutural aceito pela SPEC: `MERCHANT:`, `DATE:`, `ITEM:` e `TOTAL:`.
+
+#### Isolamento da causa
+
+`FX-024` será construída para isolar exclusivamente `unexpected_record`:
+
+* a entrada não está vazia;
+* existem exatamente um `MERCHANT`, uma `DATE`, um `ITEM` e um `TOTAL`;
+* não existe `MERCHANT`, `DATE` ou `TOTAL` duplicado;
+* nenhum registro obrigatório está ausente;
+* `MERCHANT:`, `DATE:`, `ITEM:` e `TOTAL:` são conhecidos;
+* somente `NOTE:` é desconhecido;
+* a linha `ITEM` possui exatamente três separadores `|` e quatro campos;
+* `description == "Arroz"`;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* todos os valores numéricos são positivos e convertíveis;
+* `quantity × unit_price == line_total`;
+* `TOTAL == "10.00"` e corresponde ao acumulado;
+* não existe conteúdo depois de `TOTAL`;
+* o único defeito intencional é o prefixo desconhecido `NOTE:`.
+
+Removendo somente a terceira linha, a entrada restante seria válida:
+
+```text
+MERCHANT: Mercado Exemplo
+DATE: 2026-07-24
+ITEM: Arroz | 1 | 10.00 | 10.00
+TOTAL: 10.00
+```
+
+Essa versão possui sequência estrutural válida, todos os registros obrigatórios, cardinalidades válidas, um `ITEM` válido e um `TOTAL` coerente. Portanto, o defeito de `FX-024` é introduzido exclusivamente por `NOTE: Cupom`.
+
+`FX-024` permanece apenas planejada. Nenhuma fixture ou expected output foi criado para este cenário.
+
 ## Expected Output Manifest
 
 | ID        | File                                               | Related fixture | Format | Purpose                                             |
@@ -841,6 +902,7 @@ duas ocorrências reconhecidas de DATE
 | `AC-008`             | `SCN-021`            | `ERR-005`, `BR-001`, `missing_date` | `FX-021` | N/A             | `TEST-021`             |
 | N/A                  | `SCN-022`            | `ERR-003`, `BR-001`, `duplicate_merchant` | `FX-022` | N/A        | `TEST-022`             |
 | N/A                  | `SCN-023`            | `ERR-006`, `BR-001`, `duplicate_date` | `FX-023` | N/A            | `TEST-023`             |
+| N/A                  | `SCN-024`            | `ERR-019`, `BR-010`, `unexpected_record` | `FX-024` | N/A       | `TEST-024`             |
 
 ## Scenario Expansion
 
@@ -1828,6 +1890,261 @@ Decision: Keep explicit guards
 
 A implementação de `SCN-023` reutilizou `date_records`, acrescentou somente a guarda explícita de cardinalidade necessária e manteve a precedência visível em `parse_receipt`. Uma nova busca por `DATE:`, helper, índice estrutural, enum, classe de registro, máquina de estados e refatoração das demais guardas permaneceram fora do escopo.
 
+### SCN-024 — Receipt with unknown prefix between DATE and ITEM
+
+**Status:** planned, not implemented
+
+**Covers:** `ERR-019`, `BR-010`, `unexpected_record`, Error Contract
+
+**Given**
+
+* a entrada não está vazia;
+* existe exatamente um `MERCHANT`;
+* `MERCHANT` contém `"Mercado Exemplo"`;
+* existe exatamente uma `DATE`;
+* `DATE` contém `"2026-07-24"`;
+* depois de `DATE` existe uma linha não vazia iniciada por `NOTE:`;
+* `NOTE` contém `"Cupom"`;
+* `NOTE:` não pertence ao vocabulário estrutural reconhecido;
+* depois da linha `NOTE` existe exatamente um `ITEM`;
+* o `ITEM` possui exatamente quatro campos;
+* `description == "Arroz"`;
+* `quantity == "1"`;
+* `unit_price == "10.00"`;
+* `line_total == "10.00"`;
+* `quantity × unit_price == line_total`;
+* existe exatamente um `TOTAL`;
+* `TOTAL == "10.00"` e corresponde à soma dos itens;
+* `MERCHANT:`, `DATE:`, `ITEM:` e `TOTAL:` possuem prefixos conhecidos;
+* não existe registro singleton duplicado;
+* não existe registro obrigatório ausente;
+* o único defeito intencional é o prefixo desconhecido `NOTE:`.
+
+**When**
+
+* `parse_receipt(raw_text)` é executado.
+
+**Then**
+
+* `ReceiptValidationError` é lançada;
+* `error.code == "unexpected_record"`;
+* `error.message` é uma string não vazia e legível;
+* `invalid_record_order` não é emitido;
+* `missing_merchant` não é emitido;
+* `missing_date` não é emitido;
+* `missing_item` não é emitido;
+* `missing_total` não é emitido;
+* `duplicate_merchant` não é emitido;
+* `duplicate_date` não é emitido;
+* `duplicate_total` não é emitido;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado ou parcial é retornado.
+
+O texto exato da mensagem não faz parte do contrato. A linha desconhecida está fisicamente na linha 3, e o comportamento atual também informa `line_number == 3`, mas `SCN-024` não estabelece valor obrigatório para `line_number`.
+
+#### Unknown prefix versus recognized record out of order
+
+Um registro conhecido em posição proibida mantém o contrato `invalid_record_order`:
+
+```text
+MERCHANT
+ITEM
+DATE
+TOTAL
+→ invalid_record_order
+```
+
+`ITEM:` e `DATE:` pertencem ao vocabulário estrutural; o defeito é a sequência proibida.
+
+Em `SCN-024`:
+
+```text
+MERCHANT
+DATE
+NOTE
+ITEM
+TOTAL
+→ unexpected_record
+```
+
+`NOTE:` não pertence ao vocabulário e não representa `MERCHANT`, `DATE`, `ITEM` ou `TOTAL` deslocado. Por isso, `unexpected_record` deve prevalecer sobre a classificação genérica atualmente observada, `Record is out of order; expected ITEM on line 3.`.
+
+#### Unknown prefix versus line without a prefix
+
+`SCN-024` formaliza somente:
+
+```text
+NOTE: Cupom
+```
+
+A linha possui um prefixo textual, dois-pontos e conteúdo não vazio, mas seu tipo estrutural é desconhecido.
+
+Uma linha como:
+
+```text
+Cupom aplicado
+```
+
+também pode pertencer a `unexpected_record` conforme a SPEC, mas não está coberta por `SCN-024`. Prefixo desconhecido e linha sem prefixo não serão materializados no mesmo cenário.
+
+#### Unknown prefix versus duplication
+
+`MERCHANT:`, `DATE:`, `ITEM:` e `TOTAL:` são prefixos conhecidos. Portanto, ocorrências singleton repetidas preservam seus contratos:
+
+```text
+segunda ocorrência de MERCHANT
+→ duplicate_merchant
+
+segunda ocorrência de DATE
+→ duplicate_date
+
+segunda ocorrência de TOTAL
+→ duplicate_total
+```
+
+Esses registros não se tornam inesperados quando repetidos. `FX-024` possui cardinalidade válida para todos os registros conhecidos.
+
+#### Unknown prefix versus invalid content
+
+Conteúdo inválido depois de um prefixo conhecido continua usando o contrato específico aplicável:
+
+```text
+ITEM: conteúdo malformado
+→ invalid_item_format
+
+TOTAL: abc
+→ invalid_receipt_total
+```
+
+Em ambos os casos, o tipo estrutural é conhecido. `NOTE: Cupom` não começa com qualquer prefixo aceito e, portanto, pertence a `unexpected_record`.
+
+#### Relationship with required records
+
+`FX-024` contém exatamente um `MERCHANT`, uma `DATE`, um `ITEM` e um `TOTAL`. Assim, não se aplicam:
+
+* `missing_merchant`;
+* `duplicate_merchant`;
+* `missing_date`;
+* `duplicate_date`;
+* `missing_item`;
+* `missing_total`;
+* `duplicate_total`.
+
+A presença física do `ITEM` depois de `NOTE:` impede que a linha desconhecida seja interpretada como ausência do registro repetível. As guardas de presença e cardinalidade de `MERCHANT` e `DATE` são ultrapassadas antes de o parser alcançar a linha desconhecida.
+
+O `ITEM` planejado possui quatro campos válidos, e `1 × 10.00 == 10.00`. O único `TOTAL` também contém `"10.00"` e corresponde ao acumulado. Portanto, não se aplicam `invalid_item_format`, `invalid_item_description`, `invalid_quantity`, `invalid_unit_price`, `invalid_line_total`, `line_total_mismatch`, `invalid_receipt_total` ou `receipt_total_mismatch`.
+
+#### Unknown prefix versus content after TOTAL
+
+`FX-024` coloca `NOTE:` antes do primeiro `ITEM` e não possui conteúdo depois de `TOTAL`.
+
+O caso:
+
+```text
+MERCHANT
+DATE
+ITEM
+TOTAL
+NOTE
+```
+
+pode envolver `unexpected_record` e a regra específica sobre conteúdo posterior a `TOTAL`. Essa sobreposição permanece fora do escopo de `SCN-024`.
+
+#### No silent selection or partial result
+
+O parser não deve:
+
+* ignorar ou pular silenciosamente `NOTE:`;
+* tratar `NOTE:` como `ITEM`;
+* anexar `NOTE:` ao conteúdo de `DATE` ou `ITEM`;
+* retornar normalmente;
+* retornar a nota válida como se a linha desconhecida não existisse;
+* produzir resultado parcial.
+
+A linha desconhecida deve interromper o fluxo com o erro público `unexpected_record`.
+
+#### Isolated structural precedence
+
+Para o cenário isolado, o fluxo conceitual planejado é:
+
+```text
+empty_input
+→ missing_merchant
+→ missing_date
+→ duplicate_merchant
+→ duplicate_date
+→ duplicate_total
+→ validar posições conhecidas
+→ unexpected_record quando a linha na posição de ITEM possui prefixo desconhecido
+→ invalid_record_order quando a linha possui tipo conhecido em posição proibida
+→ validar ITEMs
+→ missing_item
+→ missing_total
+→ validar TOTAL
+```
+
+Para `FX-024`, a entrada não está vazia; `MERCHANT` e `DATE` aparecem exatamente uma vez nas linhas 1 e 2; não existe duplicidade singleton; e a linha 3 começa com o prefixo desconhecido `NOTE:`. Nesse ponto, `unexpected_record` deve ser emitido antes de `invalid_record_order`, sem retorno normal.
+
+Essa sequência descreve somente a precedência observável do defeito isolado e não prescreve uma arquitetura definitiva nem define precedência para linhas desconhecidas em outras posições ou para defeitos independentes simultâneos.
+
+#### Architectural review decision
+
+`TASK-REVIEW-008` concluiu:
+
+```text
+Decision: Keep explicit guards and plan unexpected_record
+```
+
+O primeiro ciclo deve materializar somente este caso, obter um Red executável antes de abstrair, manter a precedência explícita e permitir uma correção localizada no ponto que espera `ITEM`.
+
+Conceitualmente, um futuro Green poderá distinguir:
+
+```text
+linha começa com ITEM:
+→ processar ITEM
+
+linha começa com outro prefixo conhecido
+→ invalid_record_order
+
+linha não começa com nenhum prefixo conhecido
+→ unexpected_record
+```
+
+O harness não exige nome ou assinatura de helper, constante, expressão Python específica ou reestruturação completa do loop. Neste ciclo não devem ser introduzidos helper de classificação, constante global de prefixos, índice estrutural, enum, classe de registro ou máquina de estados.
+
+#### Coverage boundaries
+
+`SCN-024` não protege:
+
+* linha sem prefixo entre `DATE` e `ITEM`;
+* prefixo desconhecido antes de `MERCHANT`;
+* prefixo desconhecido onde `DATE` é esperada;
+* prefixo desconhecido depois de `TOTAL`;
+* prefixo desconhecido entre registros `ITEM`;
+* prefixo desconhecido no lugar de `TOTAL`;
+* múltiplos prefixos desconhecidos;
+* conteúdo vazio de `MERCHANT`;
+* conteúdo vazio ou inválido de `DATE`;
+* defeitos independentes simultâneos;
+* uma política global de classificação.
+
+Um futuro Green de `TEST-024` não deve ser interpretado como implementação completa de todas as posições possíveis de `ERR-019`.
+
+#### Observed behavior before TEST-024
+
+`TASK-REVIEW-008` observou:
+
+```text
+ReceiptValidationError
+code: invalid_record_order
+message: Record is out of order; expected ITEM on line 3.
+line_number: 3
+```
+
+O Red esperado compara `error.code == "unexpected_record"` com o código atual `invalid_record_order`. Ele demonstrará que o parser já rejeita e não ignora a linha, mas ainda não distingue prefixo desconhecido de registro conhecido fora de ordem. Se o comportamento mudar antes da criação do teste, o resultado real deverá ser registrado sem fabricar um Red.
+
+Depois do Green de `TEST-024`, uma nova revisão deverá avaliar quantos pontos ainda precisam reconhecer prefixos desconhecidos, se a condição local ficou repetida, se o vocabulário passou a existir em mais de uma forma e se uma constante ou helper se tornou justificável. Essa revisão também poderá escolher entre uma linha sem prefixo e outra posição desconhecida como próximo cenário, mas não faz parte desta tarefa.
+
 ## Test Cases
 
 ### TEST-001 — Parse valid single-item receipt
@@ -2436,6 +2753,50 @@ line_number: 3
 
 Esse Red demonstrou que o parser já rejeitava a segunda ocorrência de `DATE`, mas ainda a classificava indiretamente como uma violação posicional. A guarda explícita de cardinalidade passou a emitir `duplicate_date` antes de `duplicate_total` e da validação posicional, sem criar requisito específico para `line_number`.
 
+### TEST-024 — Reject receipt with unknown prefix between DATE and ITEM
+
+**Status:** planned, not implemented
+
+**Covers:** `SCN-024`, `ERR-019`, `BR-010`, `unexpected_record`, Error Contract
+
+**Test level:** `unit`
+
+**Fixture:** `FX-024`
+
+**Expected error:** `unexpected_record`
+
+**Planned execution:**
+
+1. Carregar `invalid_unknown_prefix_between_date_and_item.txt` como texto UTF-8.
+2. Chamar somente `parse_receipt(raw_text)`.
+3. Exigir e capturar `ReceiptValidationError`.
+4. Verificar o código e a presença de mensagem legível.
+
+**Pass condition:**
+
+* `error.code == "unexpected_record"`;
+* `isinstance(error.message, str)`;
+* `error.message.strip() != ""`;
+* `invalid_record_order` não é aceito;
+* `missing_item` não é aceito;
+* nenhum código de ausência ou duplicidade estrutural é aceito;
+* o parser não retorna normalmente;
+* nenhum resultado estruturado é produzido;
+* nenhum requisito específico é imposto a `line_number`.
+
+O teste aceitará somente `unexpected_record`, sem uma lista de códigos alternativos. Embora `NOTE: Cupom` esteja fisicamente na linha 3 e o Red atual também informe essa linha, o futuro teste não deverá verificar `error.line_number == 3`, `error.line_number is None` nem qualquer outro valor.
+
+**Expected Red before implementation:**
+
+```text
+ReceiptValidationError
+code: invalid_record_order
+message: Record is out of order; expected ITEM on line 3.
+line_number: 3
+```
+
+O Red esperado demonstrará que a linha já é rejeitada e identificada como incapaz de ocupar a posição de `ITEM`, mas ainda não é classificada pelo contrato específico `unexpected_record`. `TEST-024` ainda não existe e esse Red não foi produzido por um teste materializado.
+
 ## Additional Error Validation
 
 Os demais códigos de erro definidos na SPEC podem ser validados por testes parametrizados depois dos primeiros cenários.
@@ -2470,13 +2831,14 @@ O caso não convertível de `invalid_unit_price` foi promovido para o cenário f
 
 `duplicate_date` foi promovido para `SCN-023` / `FX-023` / `TEST-023`, que estão materializados, implementados e verdes.
 
+`unexpected_record` foi promovido da tabela genérica futura para o planejamento formal `SCN-024` / `FX-024` / `TEST-024`. Os três artefatos permanecem planejados: a fixture não foi materializada, o teste não foi criado e o contrato ainda não está protegido pelo harness executável.
+
 Exemplo de tabela futura:
 
 | Error code                 | Synthetic input condition |
 | -------------------------- | ------------------------- |
 | `invalid_merchant`         | nome vazio                |
 | `invalid_date`             | `2026-02-30`              |
-| `unexpected_record`        | prefixo desconhecido      |
 
 Esses testes não precisam ser todos implementados no primeiro incremento.
 
@@ -2790,7 +3152,9 @@ Specified but not yet implemented or protected:
 
 * `unexpected_record`
 
-Os demais contratos sem cenário executável também não devem ser interpretados como implementados. `SCN-019` comprova `duplicate_total`, `SCN-022` comprova `duplicate_merchant`, e `SCN-023` comprova `duplicate_date`. `SCN-020` e `SCN-021` comprovam somente as ausências globais isoladas de `MERCHANT` e `DATE`, sem implementar conteúdo vazio, formato inválido ou combinações de ausências. `unexpected_record` permanece sem implementação.
+Os demais contratos sem cenário executável também não devem ser interpretados como implementados. `SCN-019` comprova `duplicate_total`, `SCN-022` comprova `duplicate_merchant`, e `SCN-023` comprova `duplicate_date`. `SCN-020` e `SCN-021` comprovam somente as ausências globais isoladas de `MERCHANT` e `DATE`, sem implementar conteúdo vazio, formato inválido ou combinações de ausências.
+
+`unexpected_record` permanece sem implementação e sem proteção executável. `SCN-024` planeja somente o caso de `NOTE:` entre `DATE` e `ITEM`; `FX-024` ainda não foi materializada e `TEST-024` ainda não foi criado. Esse planejamento não comprova cobertura global de `ERR-019`, não altera a lista de contratos implementados e não define `line_number`.
 
 `SCN-008` é um cenário válido e não adiciona código de erro. O contrato `invalid_quantity` está comprovado somente para a quantidade com vírgula coberta por `SCN-009`; essa evidência não estabelece suporte geral para outros formatos numéricos inválidos.
 
@@ -3190,6 +3554,25 @@ Esta sequência foi concluída. `FX-022` foi materializada, `TEST-022` expôs in
 14. Registrar as evidências no harness.
 
 Esta sequência foi concluída. `FX-023` foi materializada, `TEST-023` expôs inicialmente `invalid_record_order`, a guarda explícita passou a emitir `duplicate_date` antes de `duplicate_total` e da validação posicional, e `TEST-001` a `TEST-023` passam juntos.
+
+## TDD Sequence for SCN-024
+
+1. Formalizar `SCN-024` no harness.
+2. Criar `FX-024` com `NOTE:` entre `DATE` e `ITEM`.
+3. Criar `TEST-024` exigindo `unexpected_record`.
+4. Executar `TEST-024` e registrar o código público atual.
+5. Confirmar o Red de `invalid_record_order`.
+6. Implementar somente a distinção necessária no ponto que espera `ITEM`.
+7. Preservar `invalid_record_order` para tipos conhecidos fora de posição.
+8. Preservar os contratos de ausência e duplicidade.
+9. Não introduzir classificação estrutural global.
+10. Não criar helper, constante ou índice sem nova evidência.
+11. Executar `TEST-024` e os testes estruturais anteriores.
+12. Executar a suíte completa.
+13. Registrar as evidências no harness.
+14. Reavaliar a abstração somente depois do Green.
+
+Somente a primeira etapa está concluída nesta tarefa documental. `FX-024`, `TEST-024`, o Red executável e a implementação de `unexpected_record` permanecem futuros.
 
 ## TDD Workflow
 
@@ -3729,6 +4112,20 @@ Essa sequência descreve os cenários isolados comprovados, não uma política g
 
 O Green de `SCN-023` preservou `Decision: Keep explicit guards`: `date_records` foi reutilizado, a precedência permaneceu visível em `parse_receipt`, e nenhuma nova busca, helper, índice estrutural, enum, classe de registro, máquina de estados ou refatoração das demais guardas foi introduzida.
 
+### Planejamento atual de SCN-024
+
+* `TASK-REVIEW-008` decidiu `Decision: Keep explicit guards and plan unexpected_record`.
+* `SCN-024` formaliza somente `NOTE: Cupom` entre `DATE` e o primeiro `ITEM`.
+* `FX-024` está especificada, mas ainda não foi materializada.
+* `TEST-024` está especificado, mas ainda não foi criado nem executado.
+* O comportamento observado em sondagem foi `invalid_record_order`, com a mensagem `Record is out of order; expected ITEM on line 3.` e `line_number == 3`.
+* O Red executável ainda deverá comprovar a divergência entre o código atual e `unexpected_record`.
+* `unexpected_record` está especificado pela SPEC e planejado no harness, mas ainda não está protegido executavelmente.
+* `TEST-001` a `TEST-023` continuam implementados e verdes.
+* A decisão para o primeiro Green continua sendo manter guardas explícitas e uma mudança localizada no ponto que espera `ITEM`.
+* Helper de classificação, constante global, índice estrutural, enum, classe de registro e máquina de estados permanecem fora do escopo.
+* O cenário não alega cobertura para linha sem prefixo, outras posições desconhecidas ou uma política global de `ERR-019`.
+
 Implemented and green:
 
 * `TEST-001` / `SCN-001`
@@ -3757,7 +4154,7 @@ Implemented and green:
 
 Planned but not yet implemented:
 
-* None in the currently materialized harness.
+* `TEST-024` / `SCN-024`
 
 ### Resumo dos artefatos cobertos
 
@@ -3794,17 +4191,17 @@ Structured-error scenarios:
 
 Os nove cenários definidos no harness inicial estão materializados e possuem testes automatizados. A suíte completa está verde, e o harness inicial agora serve como rede de segurança para revisão e refatoração.
 
-`SCN-010` a `SCN-023` são expansões incrementais das lacunas já definidas na SPEC. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-023` estão verdes.
+`SCN-010` a `SCN-023` são expansões incrementais implementadas das lacunas já definidas na SPEC. `SCN-024` é a próxima expansão estrutural planejada. O harness inicial continua sendo o conjunto de `TEST-001` a `TEST-009`; com as expansões implementadas, `TEST-001` a `TEST-023` estão verdes.
 
 Não existem testes pendentes entre os artefatos atualmente materializados. Todos os vinte e três testes estão verdes.
 
 ### Lacunas ainda abertas
 
-Permanecem abertas: `unexpected_record`; conteúdo vazio ou inválido de `MERCHANT`; conteúdo vazio ou formato inválido de `DATE`; `MERCHANT` deslocado em outras posições; `DATE` depois de `ITEM` como cenário dedicado; conteúdo depois de `TOTAL`; mais de duas ocorrências de registros singleton; positividade de `quantity`, `unit_price` e `receipt_total`; e precedências entre defeitos independentes simultâneos.
+Permanece aberta a implementação de `unexpected_record`; `SCN-024` cobre documentalmente apenas um prefixo desconhecido entre `DATE` e `ITEM`. Também permanecem abertas: linha sem prefixo; prefixos desconhecidos em outras posições; conteúdo vazio ou inválido de `MERCHANT`; conteúdo vazio ou formato inválido de `DATE`; `MERCHANT` deslocado em outras posições; `DATE` depois de `ITEM` como cenário dedicado; conteúdo depois de `TOTAL`; mais de duas ocorrências de registros singleton; positividade de `quantity`, `unit_price` e `receipt_total`; e precedências entre defeitos independentes simultâneos.
 
-Antes de materializar `unexpected_record`, é necessária uma nova revisão da estrutura de reconhecimento. Essa revisão deverá avaliar manter guardas explícitas, introduzir uma classificação estrutural mínima, extrair somente um helper de reconhecimento ou adiar qualquer abstração, sem escolher uma solução antecipadamente neste harness.
+`TASK-REVIEW-008` concluiu a revisão necessária antes da primeira materialização e decidiu manter guardas explícitas para obter um Red determinístico de `SCN-024`. Uma nova avaliação de abstração deverá ocorrer somente depois do Green, considerando repetição real e os pontos ainda não cobertos.
 
-O parser agora reconhece ocorrências estruturais de `MERCHANT`, `DATE` e `TOTAL`, com verificações locais de cardinalidade para mais de um tipo de registro. A repetição permanece pequena e explícita; uma revisão separada poderá avaliar se existe benefício concreto em extrair uma abstração. Nenhum helper deve ser criado apenas para reduzir linhas, e qualquer refatoração futura deverá preservar ordem, precedência, códigos públicos e números de linha já protegidos.
+O parser agora reconhece ocorrências estruturais de `MERCHANT`, `DATE` e `TOTAL`, com verificações locais de cardinalidade para mais de um tipo de registro. A repetição permanece pequena e explícita. Nenhum helper deve ser criado apenas para reduzir linhas, e qualquer refatoração futura deverá preservar ordem, precedência, códigos públicos e números de linha já protegidos.
 
 Novos comportamentos devem ser introduzidos por novos cenários e testes, sem expansão silenciosa dos contratos atuais. O escopo permanece limitado ao formato textual controlado definido pela SPEC e não representa suporte completo a notas fiscais reais.
 
